@@ -1,45 +1,57 @@
 -- ============================================================================
--- FinAtt — let the CSV import carry an employee code and an intended portal.
+-- FinAtt — employee codes supplied by the CSV import must stay unique.
 --
--- The importer creates roster rows only; the login comes later, from "Send
--- invite" or "Create login". So a Role column in the CSV has nowhere to live at
--- import time -- profiles.role only exists once there is an account.
+-- The importer now accepts an Employee ID from the file instead of always
+-- generating EMP-000n. Two rows claiming the same code would make the code stop
+-- identifying anyone, and the importer's own in-memory check cannot see a
+-- concurrent import — so the guarantee belongs in the database.
 --
--- intended_role parks that choice on the employees row until the login is
--- created, at which point createEmployeeLogin/sendInvites reads it instead of
--- hardcoding 'employee'.
+-- Case-insensitive on purpose: "emp-0007" and "EMP-0007" are the same code to a
+-- human, and the importer upper-cases before comparing.
 --
--- It is NOT an access grant on its own. Nothing reads intended_role to decide
--- what someone may do -- is_hr() and is_admin() still read profiles.role, which
--- only set_member_role can change. Writing 'admin' here grants nothing until an
--- account is actually created from it, and the import refuses to write anything
--- but 'employee' unless the caller is an administrator.
+-- NOTE: an earlier draft of this migration also added an `intended_role` column
+-- to carry the CSV's Role value until a login was created. That has been
+-- dropped. A roster row cannot hold access in the first place — authorization
+-- reads `profiles.role` — so the column bought nothing, and referencing it from
+-- the app broke every import and login-creation with
+-- `42703 column employees.intended_role does not exist` on any database where
+-- this migration had not been run. The Role column in the CSV is still
+-- validated and still admin-gated; the portal is assigned from Members & access
+-- once the account exists, where set_member_role enforces it in Postgres.
 --
 -- Idempotent.
 -- ============================================================================
 
-alter table public.employees
-  add column if not exists intended_role text not null default 'employee';
-
+-- Fails loudly if duplicates already exist, which is the right outcome: they
+-- must be resolved by hand rather than silently kept.
 do $$
+declare
+  dupes int;
 begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'employees_intended_role_check'
-  ) then
-    alter table public.employees
-      add constraint employees_intended_role_check
-      check (intended_role in ('employee', 'hr', 'admin'));
+  select count(*) into dupes
+    from (
+      select upper(employee_id)
+        from public.employees
+       where employee_id is not null
+       group by upper(employee_id)
+      having count(*) > 1
+    ) d;
+
+  if dupes > 0 then
+    raise exception
+      'Cannot add the unique index: % employee code(s) are used more than once. '
+      'Run the SELECT below to find them, fix the duplicates, then re-run.', dupes;
   end if;
 end $$;
 
-comment on column public.employees.intended_role is
-  'Portal to grant when a login is created for this row. Not an access grant: '
-  'authorization always reads profiles.role.';
-
--- Employee codes must be unique, or two rows can claim EMP-0007 and the code
--- stops identifying anyone. The importer now accepts a code from the file, so
--- this is enforced in the database rather than trusted from the caller.
 create unique index if not exists employees_employee_id_key
   on public.employees (upper(employee_id));
 
-select 'intended_role + employee_id uniqueness applied' as status;
+-- Find duplicates if the block above raised:
+--   select upper(employee_id) as code, count(*), array_agg(email)
+--     from public.employees
+--    where employee_id is not null
+--    group by upper(employee_id)
+--   having count(*) > 1;
+
+select 'employee_id uniqueness applied' as status;

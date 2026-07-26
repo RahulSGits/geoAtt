@@ -108,7 +108,10 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
         `Login created for ${member.full_name || member.email}. Temporary password: ${res.data.password}`,
       )
       router.refresh()
-      await load()
+      // Re-read so the row flips from "No login yet" to a real account without
+      // a full page reload.
+      const refreshed = await listMembers()
+      if (refreshed.ok) setMembers(refreshed.data)
     } else {
       toast.error(res.error)
     }

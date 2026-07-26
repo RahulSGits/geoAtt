@@ -38,9 +38,17 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['localhost', '127.0.0.1', '*.trycloudflare.com'],
 
-  turbopack: {
-    root: __dirname,
-  },
+  // `turbopack.root` is deliberately NOT set.
+  //
+  // It was pinned to __dirname to stop Turbopack inferring the workspace root
+  // from the stray 92-byte package-lock.json that used to sit at the repo root
+  // (a leftover from another project, now deleted). But Vercel injects
+  // `outputFileTracingRoot: /vercel/path0` through modifyConfig, and Next warns
+  // when the two roots disagree:
+  //   "Both `outputFileTracingRoot` and `turbopack.root` are set, but they must
+  //    have the same value."
+  // With the stray lockfile gone this file is the only lockfile above the app,
+  // so inference is unambiguous and the two settings no longer conflict.
 
   // Note: the previous wildcard CORS block on /api/* is deliberately gone.
   // `Access-Control-Allow-Origin: *` together with `Allow-Credentials: true` is
