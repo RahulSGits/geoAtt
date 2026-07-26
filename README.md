@@ -46,7 +46,7 @@ Open your Supabase project → **SQL Editor** and run, in filename order:
 
 ```text
 supabase/migrations/20260721000000_finatt_full_schema.sql   ← start here
-supabase/migrations/2026072200…  through  2026073300…
+supabase/migrations/2026072200…  through  2026073700…
 ```
 
 Every migration is idempotent, so re-running is safe.
@@ -180,25 +180,26 @@ is returned and copied to the clipboard instead, so the reset can still happen.
 
 ### HR console
 - KPIs, a 14-day attendance trend, status mix and department headcount
-- Employee directory: add, edit, assign site + shift, delete, re-grant a face enrollment
-- **CSV import** — headers matched by alias, quoted fields and `DD/MM/YYYY` dates handled, duplicates skipped with a reason
-- Attendance across the company with filters and CSV export; HR-only editing of status and in/out times
+- Employee directory: add, edit, assign site + shift, audited deletion, re-grant a face enrollment
+- **CSV import** — headers matched by alias, quoted fields, `DD/MM/YYYY` dates handled, role mapping, relaxed ID rules, duplicates skipped with a clear reason
+- Attendance across the company with status and WFH filters, daily CSV export, and HR-only editing of status/times with local timezone precision
+- Team attendance calendar with per-day headcounts and daily CSV reports
 - Leave approvals — approving posts those days to the sheet, emails the employee, and marks WFH leave as *WFH* rather than *On leave*
 - Re-check-in approvals
 - Announcements with priority levels
 - **Work sites by kind** — *Office* (geofenced, map editor with radius, address geocoding, and Leaflet/Google Maps providers), *Remote* (no location check), or *Hybrid*
 - Shifts: working days, work mode, grace period, and the thresholds driving Present/Half/Absent
-- Member directory: onboard employees, send reset links *(portal assignment is admin-only)*
+- Member directory: onboard employees, direct password setting, send reset links *(portal assignment is admin-only)*
 
 ### Admin console
-Everything above, plus **Members & access** (assign portals, invite HR and admins),
+Everything above, plus **Members & access** (assign portals, invite HR and admins, audited account deletion with password verification),
 **Sign-in activity**, and **Diagnostics** — which reports the state of the service key,
 email, site URL and AI configuration, and names the specific fault rather than just
 "missing".
 
 ---
 
-## How verification works
+## How verification and security work
 
 | Layer | Where it runs | What it stops |
 | ----- | ------------- | ------------- |
@@ -206,7 +207,9 @@ email, site URL and AI configuration, and names the specific fault rather than j
 | Blink liveness | Browser, via MediaPipe blendshapes across frames | A printed photo or a phone screen |
 | Geofence | Browser **and** re-checked server-side with haversine | Checking in from home |
 | GPS accuracy gate | Both | A vague fix being treated as precise |
-| Row Level Security | Postgres | Reading anyone else's records |
+| Role Protection | Postgres | Self-editing `profiles.role` to gain unauthorized access |
+| Audited Account Deletion | Postgres RPC | Bypassing authorization; requires caller's password and records audit trail |
+| Row Level Security | Postgres | Reading or modifying anyone else's records |
 
 Face data is stored as a 128-float descriptor, never as a reference photograph — the numbers
 cannot be turned back into an image, so there is no photo library to leak. Check-in selfies
