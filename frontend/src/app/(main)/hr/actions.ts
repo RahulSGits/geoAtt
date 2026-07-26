@@ -154,26 +154,6 @@ interface EmployeeInput {
 }
 
 /**
- * Whether `employees.intended_role` exists, remembered per server process.
- *
- * The column arrives with migration 20260737. Both call sites already fall back
- * when it is absent, but without this flag every login-creation and every
- * import re-attempted the doomed query first — filling the Postgres log with
- * `42703 column employees.intended_role does not exist` and costing a wasted
- * round-trip each time. The first failure now switches the app to the
- * fallback shape permanently.
- *
- * Starts as `true` so a database that HAS the column never pays a probe, and
- * resets on redeploy, which is when the migration would have been applied.
- */
-let intendedRoleColumnExists = true
-
-/** True when an error is Postgres complaining that intended_role is missing. */
-function isMissingIntendedRole(message: string | undefined): boolean {
-  return /intended_role/i.test(message ?? '')
-}
-
-/**
  * A usable employee code.
  *
  * Deliberately permissive. FinAtt generates `EMP-0001`, but an imported roster
@@ -295,60 +275,19 @@ export async function createEmployeeLogin(
     const employeeId = String(formData.get('employeeId') ?? '')
     if (!employeeId) return fail('Missing employee.')
 
-    interface LoginTarget {
-      id: string
-      email: string
-      full_name: string
-      user_id: string | null
-      department: string | null
-      designation: string | null
-      phone: string | null
-      intended_role: string | null
-    }
-
-    const CORE_COLUMNS = 'id, email, full_name, user_id, department, designation, phone'
-
-    // intended_role arrives with migration 20260737. Selecting it on a database
-    // that has not run that migration fails the whole lookup with
-    // "column employees.intended_role does not exist", which blocked login
-    // creation entirely -- so fall back to the core columns and default the
-    // role, exactly as the CSV importer does for the matching insert.
-    const readCore = async () => {
-      const r = await supabase
-        .from('employees')
-        .select(CORE_COLUMNS)
-        .eq('id', employeeId)
-        .maybeSingle<Omit<LoginTarget, 'intended_role'>>()
-      return {
-        data: r.data ? ({ ...r.data, intended_role: null } as LoginTarget) : null,
-        error: r.error,
-      }
-    }
-
-    let employee: LoginTarget | null = null
-    let lookupError: { message: string } | null = null
-
-    if (intendedRoleColumnExists) {
-      const r = await supabase
-        .from('employees')
-        .select(`${CORE_COLUMNS}, intended_role`)
-        .eq('id', employeeId)
-        .maybeSingle<LoginTarget>()
-      employee = r.data
-      lookupError = r.error
-
-      if (lookupError && isMissingIntendedRole(lookupError.message)) {
-        // Remember, so no later request repeats this failure.
-        intendedRoleColumnExists = false
-        console.warn(
-          '[hr] employees.intended_role is missing — falling back for the rest of this ' +
-            'process. Apply migration 20260737000000_import_role_and_code.sql.',
-        )
-        ;({ data: employee, error: lookupError } = await readCore())
-      }
-    } else {
-      ;({ data: employee, error: lookupError } = await readCore())
-    }
+    const { data: employee, error: lookupError } = await supabase
+      .from('employees')
+      .select('id, email, full_name, user_id, department, designation, phone')
+      .eq('id', employeeId)
+      .maybeSingle<{
+        id: string
+        email: string
+        full_name: string
+        user_id: string | null
+        department: string | null
+        designation: string | null
+        phone: string | null
+      }>()
 
     if (lookupError) return fail(lookupError.message)
     if (!employee) return fail('That employee no longer exists.')
@@ -359,16 +298,15 @@ export async function createEmployeeLogin(
     const supplied = String(formData.get('password') ?? '')
     const password = supplied.length >= 8 ? supplied : generatePassword()
 
-    // The portal the CSV import (or the add form) asked for, defaulting to
-    // employee. Re-checked here rather than trusted from the row: intended_role
-    // is only a note, and HR must not be able to mint an admin by editing it.
-    const intended = employee.intended_role ?? 'employee'
-    const grantedRole =
-      intended !== 'employee' && session.role === 'admin' ? intended : 'employee'
+    // Always an employee account. Granting HR or admin is a separate, explicit
+    // act -- an administrator changes the portal from Members & access, where
+    // set_member_role enforces the rule in Postgres. Deriving it from a roster
+    // field here would let a CSV decide who is an administrator.
+    void session
 
     const metadata = {
       full_name: employee.full_name,
-      role: grantedRole,
+      role: 'employee',
       phone: employee.phone ?? '',
       department: employee.department ?? '',
       designation: employee.designation ?? '',
@@ -527,7 +465,6 @@ export async function importEmployees(
       employee_id: row.employeeId || allocate(),
       full_name: row.fullName,
       email: row.email,
-      intended_role: row.role || 'employee',
       phone: row.phone || null,
       department: row.department || null,
       designation: row.designation || null,
@@ -537,40 +474,18 @@ export async function importEmployees(
       status: 'active',
     }))
 
-    const withoutRole = () =>
-      payload.map((p) => {
-        const row = { ...p } as Record<string, unknown>
-        delete row.intended_role
-        return row
-      })
-
-    // intended_role arrives with 20260737. Until that migration is applied the
-    // column does not exist and the whole insert fails, which would make the
-    // importer look broken on any deployment that has not run it yet. Drop the
-    // field -- the roster still imports, only the portal hint is lost.
-    let error: { message: string } | null = null
-    let count: number | null = null
-
-    if (intendedRoleColumnExists) {
-      ;({ error, count } = await supabase
-        .from('employees')
-        .insert(payload, { count: 'exact' }))
-
-      if (error && isMissingIntendedRole(error.message)) {
-        intendedRoleColumnExists = false
-        console.warn(
-          '[importEmployees] intended_role column missing; roles were not stored. ' +
-            'Apply migration 20260737000000_import_role_and_code.sql.',
-        )
-        ;({ error, count } = await supabase
-          .from('employees')
-          .insert(withoutRole(), { count: 'exact' }))
-      }
-    } else {
-      ;({ error, count } = await supabase
-        .from('employees')
-        .insert(withoutRole(), { count: 'exact' }))
-    }
+    // The Role column is validated above but deliberately NOT stored on the
+    // roster row. `employees` has no role field, and adding one would mean a
+    // migration this deployment may not have run -- which is exactly what made
+    // every import and login-creation fail with
+    // "column employees.intended_role does not exist".
+    //
+    // Nothing is lost: a roster row cannot hold access anyway. Portals live on
+    // `profiles`, so the role is assigned once a login exists, from
+    // Members & access, where set_member_role enforces it in Postgres.
+    const { error, count } = await supabase
+      .from('employees')
+      .insert(payload, { count: 'exact' })
 
     if (error) {
       // A duplicate code is the one failure worth naming precisely: the whole
