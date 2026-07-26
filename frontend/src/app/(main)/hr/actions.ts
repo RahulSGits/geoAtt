@@ -153,8 +153,17 @@ interface EmployeeInput {
   shiftId?: string
 }
 
-/** Employee codes look like EMP-0001. Anything else is rejected, not coerced. */
-const EMPLOYEE_CODE_RE = /^[A-Z][A-Z0-9]*-\d{1,6}$/
+/**
+ * A usable employee code.
+ *
+ * Deliberately permissive. FinAtt generates `EMP-0001`, but an imported roster
+ * carries whatever the previous system used — `ND33004`, `2024/117`, `E_88` —
+ * and rejecting those made the importer refuse entire files for no good reason.
+ * The only real requirements are that a code is short, has no whitespace (it is
+ * matched and compared as a key), and holds nothing that would break a CSV
+ * round-trip or an HTML render.
+ */
+const EMPLOYEE_CODE_RE = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,31}$/
 
 function readEmployeeInput(formData: FormData): EmployeeInput {
   return {
@@ -411,7 +420,12 @@ export async function importEmployees(
       } else if (taken.has(email)) {
         skipped.push({ email, reason: 'Already on the roster' })
       } else if (code && !EMPLOYEE_CODE_RE.test(code)) {
-        skipped.push({ email, reason: `Employee ID "${code}" is not in the form EMP-0001` })
+        skipped.push({
+          email,
+          reason:
+            `Employee ID "${code}" cannot be used — up to 32 characters, letters, ` +
+            'digits, . _ / or -, and no spaces',
+        })
       } else if (code && codesTaken.has(code)) {
         skipped.push({ email, reason: `Employee ID ${code} is already in use` })
       } else if (!['employee', 'hr', 'admin'].includes(role)) {
@@ -463,11 +477,37 @@ export async function importEmployees(
       status: 'active',
     }))
 
-    const { error, count } = await supabase
+    let { error, count } = await supabase
       .from('employees')
       .insert(payload, { count: 'exact' })
 
-    if (error) return fail(error.message)
+    // intended_role arrives with 20260737. Until that migration is applied the
+    // column does not exist and the whole insert fails, which would make the
+    // importer look broken on any deployment that has not run it yet. Drop the
+    // field and retry -- the roster still imports, only the portal hint is lost.
+    if (error && /intended_role/i.test(error.message)) {
+      const stripped = payload.map(({ intended_role: _omit, ...rest }) => rest)
+      ;({ error, count } = await supabase
+        .from('employees')
+        .insert(stripped, { count: 'exact' }))
+      if (!error) {
+        console.warn(
+          '[importEmployees] intended_role column missing; roles were not stored. ' +
+            'Apply migration 20260737000000_import_role_and_code.sql.',
+        )
+      }
+    }
+
+    if (error) {
+      // A duplicate code is the one failure worth naming precisely: the whole
+      // batch rolls back, so "already in use" is more useful than the raw text.
+      if (/employees_employee_id_key|duplicate key/i.test(error.message)) {
+        return fail(
+          'One of the Employee IDs in this file is already on the roster. Nothing was imported.',
+        )
+      }
+      return fail(error.message)
+    }
 
     refresh()
     return { ok: true, data: { created: count ?? payload.length, skipped } }

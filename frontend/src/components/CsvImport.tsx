@@ -272,9 +272,9 @@ export default function CsvImport({
         )}
 
         <Alert tone="info">
-          Imported staff can sign in as soon as they register at <strong>/register</strong>{' '}
-          with the same email — their record links automatically. Or select them in the
-          directory and send an invite email.
+          Importing creates roster records, not logins. Select the new rows in the directory
+          and use <strong>Create login</strong> or <strong>Send invite</strong> to give them
+          access — public sign-up does not exist, so they cannot register themselves.
         </Alert>
 
         <button onClick={onCancel} className="btn btn-primary w-full">

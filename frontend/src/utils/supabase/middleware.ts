@@ -1,8 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-/** Routes reachable without a session. */
-const PUBLIC_PATHS = ['/', '/login', '/register', '/auth/callback']
+/** Routes reachable without a session. There is no public sign-up. */
+const PUBLIC_PATHS = ['/', '/login', '/auth/callback']
 
 const isPublic = (path: string) =>
   PUBLIC_PATHS.includes(path) || path.startsWith('/auth/')
@@ -35,7 +35,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
-  const isAuthRoute = path === '/login' || path === '/register'
+  const isAuthRoute = path === '/login'
 
   const redirectTo = (pathname: string) => {
     const url = request.nextUrl.clone()
