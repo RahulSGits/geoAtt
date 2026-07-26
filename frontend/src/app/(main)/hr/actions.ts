@@ -1976,12 +1976,50 @@ export async function setMemberRole(formData: FormData): Promise<ActionResult> {
     if (!['admin', 'hr', 'employee'].includes(role)) return fail('Pick a valid portal.')
 
     const { error } = await supabase.rpc('set_member_role', { target, new_role: role })
-    if (error) {
-      return fail(
-        /set_member_role/i.test(error.message)
-          ? 'Role management is not set up on this deployment yet. Run the admin-role migrations.'
-          : error.message,
+
+    // set_member_role ships with 20260731. Where it is absent, do the same work
+    // here instead of refusing: check the caller is an admin, refuse to demote
+    // the last one, then write profiles.role with the service key (the
+    // profiles_guard_role trigger, if present, allows a service-role write).
+    if (error && /set_member_role|function .* does not exist|PGRST202/i.test(error.message)) {
+      console.warn(
+        '[setMemberRole] set_member_role missing; using the application path. ' +
+          'Apply 20260731000000_role_management.sql for database-side enforcement.',
       )
+
+      const session = await requireRole('hr')
+      if (session.role !== 'admin') {
+        return fail('Only an administrator can change portals.')
+      }
+
+      const admin = adminClient()
+      if (!admin) return fail(SERVICE_KEY_HELP)
+
+      // The last-admin rule, which the function would normally hold.
+      const { data: current } = await admin
+        .from('profiles')
+        .select('role')
+        .eq('id', target)
+        .maybeSingle<{ role: string }>()
+
+      if (current?.role === 'admin' && role !== 'admin') {
+        const { count } = await admin
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', 'admin')
+        if ((count ?? 0) <= 1) {
+          return fail('The last administrator cannot be demoted. Promote someone else first.')
+        }
+      }
+
+      const { error: writeError } = await admin
+        .from('profiles')
+        .update({ role })
+        .eq('id', target)
+
+      if (writeError) return fail(writeError.message)
+    } else if (error) {
+      return fail(error.message)
     }
 
     // target is a profile (user) id, so notify the recipient directly rather
