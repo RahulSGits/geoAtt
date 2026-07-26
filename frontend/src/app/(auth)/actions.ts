@@ -113,6 +113,39 @@ function describeAuthError(error: {
   return INVALID_CREDENTIALS
 }
 
+/**
+ * True when this address is on the employee roster but has no login attached.
+ *
+ * Uses the service-role key rather than the request's client: the caller is not
+ * signed in, and the employees RLS policies correctly return nothing to an
+ * anonymous reader — so the request's own client always answers "no" and the
+ * message below would never appear. This runs only inside the server action, so
+ * the key never reaches the browser.
+ *
+ * Best-effort in the safe direction: no service key, or any failure, means
+ * false and the caller falls back to the generic credential message.
+ */
+async function isRosterOnly(email: string): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return false
+
+  try {
+    const admin = createStatelessClient(url, key, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+    const { data } = await admin
+      .from('employees')
+      .select('user_id')
+      .eq('email', email)
+      .is('user_id', null)
+      .maybeSingle<{ user_id: string | null }>()
+    return Boolean(data)
+  } catch {
+    return false
+  }
+}
+
 function landingFor(role: Role): string {
   if (role === 'admin') return '/admin'
   return role === 'hr' ? '/hr' : '/employee'
@@ -145,7 +178,24 @@ export async function login(formData: FormData): Promise<AuthActionState> {
     const result = await withNetworkRetry(() =>
       supabase.auth.signInWithPassword({ email, password }),
     )
-    if (result.error) return { error: describeAuthError(result.error) }
+    if (result.error) {
+      // "Invalid email or password" is the right answer for a wrong password,
+      // but it is actively misleading for someone who is on the roster and has
+      // no account yet -- the whole of a CSV-imported workforce. They retype
+      // the shared password forever because nothing says an account is missing.
+      //
+      // This does confirm the address is on the roster, which the generic
+      // message deliberately hides. Accepted here: FinAtt has no public
+      // sign-up, so an imported employee already knows they are in the system,
+      // and the alternative is every one of them filing a support ticket.
+      if (/invalid.*credential/i.test(result.error.message) && (await isRosterOnly(email))) {
+        return {
+          error:
+            'Your sign-in account has not been created yet. Ask HR or an administrator to create your login.',
+        }
+      }
+      return { error: describeAuthError(result.error) }
+    }
     data = result.data
   } catch (err) {
     // Both attempts hit the network, so the credentials were never checked.

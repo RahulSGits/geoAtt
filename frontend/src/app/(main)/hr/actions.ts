@@ -295,8 +295,15 @@ export async function createEmployeeLogin(
       return fail(`${employee.full_name} already has an account. Send a password reset instead.`)
     }
 
+    // The shared starting password, matching inviteMember.
+    //
+    // This used to be generatePassword(), so the two ways of onboarding someone
+    // handed out different passwords: an invite gave finbud@123 while "Create
+    // login" gave a random string shown once in a toast. For a bulk import
+    // that is unusable — nobody can tell 119 people their individual string.
+    // HR may still pass an explicit password to override it.
     const supplied = String(formData.get('password') ?? '')
-    const password = supplied.length >= 8 ? supplied : generatePassword()
+    const password = supplied.length >= MIN_PASSWORD_LENGTH ? supplied : DEFAULT_PASSWORD
 
     // Always an employee account. Granting HR or admin is a separate, explicit
     // act -- an administrator changes the portal from Members & access, where
@@ -371,17 +378,11 @@ export async function createEmployeeLogin(
   }
 }
 
-/**
- * Readable but high-entropy temporary password: ~62 bits, no ambiguous glyphs
- * (0/O, 1/l/I) so it survives being read aloud or copied off a screen.
- */
-function generatePassword(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
-  const bytes = new Uint32Array(12)
-  crypto.getRandomValues(bytes)
-  const body = Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('')
-  return `${body.slice(0, 4)}-${body.slice(4, 8)}-${body.slice(8, 12)}`
-}
+// A per-account random-password generator lived here. Both onboarding paths now
+// start everyone on DEFAULT_PASSWORD, by explicit decision: this deployment has
+// no email provider, so a password nobody can be told is a password nobody can
+// use. Reinstate it (and wire it into createEmployeeLogin) once RESEND_API_KEY
+// is set and invites can carry a link instead.
 
 /** Bulk-create employees from a parsed CSV. Partial success is reported, not thrown. */
 export async function importEmployees(
@@ -1218,6 +1219,65 @@ async function deleteAuthUser(userId: string): Promise<string> {
 }
 
 /**
+ * Delete an employee without `delete_employee_record`.
+ *
+ * Used only where that migration has not been applied. It reproduces the checks
+ * the function would have made in Postgres:
+ *   - an employee cannot delete themselves
+ *   - HR cannot remove a row whose login is HR or admin (only an admin can)
+ * and then removes the roster row (attendance and leaves cascade) and the
+ * sign-in. The caller has already proved their password and typed the name.
+ *
+ * Weaker than the RPC in one way worth stating: these checks live in the
+ * application, so they hold for anyone coming through the app but not for a
+ * direct PostgREST call with a stolen HR token. That is what the migration
+ * fixes.
+ */
+async function deleteEmployeeWithoutRpc(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  session: Session,
+  id: string,
+  employee: { full_name: string; user_id: string | null },
+): Promise<ActionResult<DeleteOutcome>> {
+  if (employee.user_id && employee.user_id === session.userId) {
+    return fail('You cannot delete your own account.')
+  }
+
+  if (employee.user_id) {
+    const { data: target } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', employee.user_id)
+      .maybeSingle<{ role: string }>()
+
+    if (target && target.role !== 'employee' && session.role !== 'admin') {
+      return fail('Only an administrator can remove an HR or admin account.')
+    }
+  }
+
+  // The login goes first: if it survived while the roster row vanished, the
+  // account would still be able to sign in.
+  let login: string = 'none'
+  if (employee.user_id) {
+    login = await deleteAuthUser(employee.user_id)
+    if (login === 'failed') {
+      return fail(
+        'Their sign-in account could not be removed, so nothing was deleted. ' +
+          'Check the service-role key on the Diagnostics tab.',
+      )
+    }
+  }
+
+  // Deleting auth.users cascades to profiles and then to employees, so this is
+  // usually a no-op — and the real delete when there was no login to cascade.
+  const { error: rowError } = await supabase.from('employees').delete().eq('id', id)
+  if (rowError) return fail(rowError.message)
+
+  refresh()
+  return { ok: true, data: { name: employee.full_name, login } }
+}
+
+/**
  * Permanently remove an employee: roster row, attendance, leaves, profile and
  * sign-in. For someone who has simply left, set their status to `inactive` on
  * the edit form instead — that keeps the history intact for reporting.
@@ -1265,13 +1325,19 @@ export async function deleteEmployee(
       drop_login: true,
     })
 
-    if (error) {
-      return fail(
-        /delete_employee_record/i.test(error.message)
-          ? 'Employee deletion is not set up on this deployment yet. Run the account-deletion migration.'
-          : error.message,
+    // The RPC ships with 20260735. Where it is absent, do the same work here
+    // rather than refusing outright — the name, the password and the role check
+    // below all still run, so the only thing lost is the database-side
+    // enforcement, which is defence in depth rather than the only gate.
+    if (error && /delete_employee_record|function .* does not exist|PGRST202/i.test(error.message)) {
+      console.warn(
+        '[deleteEmployee] delete_employee_record missing; using the application path. ' +
+          'Apply 20260735000000_account_deletion.sql for database-side enforcement.',
       )
+      return await deleteEmployeeWithoutRpc(supabase, session, id, employee)
     }
+
+    if (error) return fail(error.message)
 
     const outcome = (data ?? {}) as { auth_user_state?: string }
     let login = outcome.auth_user_state ?? 'none'

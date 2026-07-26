@@ -15,7 +15,7 @@ import {
   Spinner,
 } from '@/components/ui'
 import { formatDateTime } from '@/lib/format'
-import { MIN_PASSWORD_LENGTH } from '@/lib/types'
+import { DEFAULT_PASSWORD, MIN_PASSWORD_LENGTH } from '@/lib/types'
 import {
   createEmployeeLogin,
   deleteMember,
@@ -67,20 +67,81 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
     })
   }, [])
 
+  /**
+   * Put a member on a portal, creating their account first if they have none.
+   *
+   * A portal lives on `profiles`, so a roster row imported from CSV has nowhere
+   * to hold one. Rather than disable the control and make the admin go and
+   * create 119 logins by hand first, clicking a portal here does both steps:
+   * create the login, then assign. `member.id` is the employees row id until
+   * the account exists, so the profile id has to be looked up afterwards.
+   */
   async function assign(member: Member, role: string) {
-    if (role === member.role) return
+    if (role === member.role && member.hasLogin !== false) return
     setSavingId(member.id)
 
+    let memberId = member.id
+
+    if (member.hasLogin === false) {
+      if (!member.employeeRowId) {
+        toast.error('That row has no employee record to create a login from.')
+        setSavingId(null)
+        return
+      }
+
+      const createFd = new FormData()
+      createFd.set('employeeId', member.employeeRowId)
+      const created = await createEmployeeLogin(createFd)
+      if (!created.ok) {
+        toast.error(created.error)
+        setSavingId(null)
+        return
+      }
+
+      // The new profile shares the employee's email; find its id so the role
+      // can be assigned against the account rather than the roster row.
+      const refreshed = await listMembers()
+      if (!refreshed.ok) {
+        toast.error(refreshed.error)
+        setSavingId(null)
+        return
+      }
+      setMembers(refreshed.data)
+
+      const account = refreshed.data.find(
+        (m) => m.hasLogin !== false && m.email.toLowerCase() === member.email.toLowerCase(),
+      )
+      if (!account) {
+        toast.success(
+          `Login created for ${member.full_name || member.email}, but the account was not ready in time to set the portal. Try the portal again.`,
+        )
+        setSavingId(null)
+        return
+      }
+      memberId = account.id
+
+      if (role === 'employee') {
+        toast.success(
+          `Login created for ${member.full_name || member.email}. They sign in with ${DEFAULT_PASSWORD}.`,
+        )
+        setSavingId(null)
+        return
+      }
+    }
+
     const fd = new FormData()
-    fd.set('memberId', member.id)
+    fd.set('memberId', memberId)
     fd.set('role', role)
     const res = await setMemberRole(fd)
 
     if (res.ok) {
-      toast.success(`${member.full_name || member.email} is now ${role}.`)
-      setMembers((prev) =>
-        prev ? prev.map((m) => (m.id === member.id ? { ...m, role } : m)) : prev,
+      toast.success(
+        member.hasLogin === false
+          ? `Login created for ${member.full_name || member.email} and set to ${role}. Starting password: ${DEFAULT_PASSWORD}`
+          : `${member.full_name || member.email} is now ${role}.`,
       )
+      const after = await listMembers()
+      if (after.ok) setMembers(after.data)
       router.refresh()
     } else {
       toast.error(res.error)
@@ -105,7 +166,7 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
 
     if (res.ok) {
       toast.success(
-        `Login created for ${member.full_name || member.email}. Temporary password: ${res.data.password}`,
+        `Login created for ${member.full_name || member.email}. They sign in with the shared starting password: ${res.data.password}`,
       )
       router.refresh()
       // Re-read so the row flips from "No login yet" to a real account without
@@ -277,7 +338,6 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                               const Icon = r.icon
                               const disabled =
                                 !isAdmin ||
-                                noLogin ||
                                 savingId === member.id ||
                                 (lockLastAdmin && r.value !== 'admin')
                               return (
@@ -286,12 +346,12 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                                   onClick={() => assign(member, r.value)}
                                   disabled={disabled}
                                   title={
-                                    noLogin
-                                      ? 'Create a login first — a portal is assigned to an account'
-                                      : !isAdmin
-                                        ? 'Only an administrator can change portals'
-                                        : lockLastAdmin && r.value !== 'admin'
-                                          ? 'Promote someone else to admin first'
+                                    !isAdmin
+                                      ? 'Only an administrator can change portals'
+                                      : lockLastAdmin && r.value !== 'admin'
+                                        ? 'Promote someone else to admin first'
+                                        : noLogin
+                                          ? `Create their login and set ${r.label}`
                                           : `Set ${r.label}`
                                   }
                                   className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 cursor-pointer"
