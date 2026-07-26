@@ -154,6 +154,26 @@ interface EmployeeInput {
 }
 
 /**
+ * Whether `employees.intended_role` exists, remembered per server process.
+ *
+ * The column arrives with migration 20260737. Both call sites already fall back
+ * when it is absent, but without this flag every login-creation and every
+ * import re-attempted the doomed query first — filling the Postgres log with
+ * `42703 column employees.intended_role does not exist` and costing a wasted
+ * round-trip each time. The first failure now switches the app to the
+ * fallback shape permanently.
+ *
+ * Starts as `true` so a database that HAS the column never pays a probe, and
+ * resets on redeploy, which is when the migration would have been applied.
+ */
+let intendedRoleColumnExists = true
+
+/** True when an error is Postgres complaining that intended_role is missing. */
+function isMissingIntendedRole(message: string | undefined): boolean {
+  return /intended_role/i.test(message ?? '')
+}
+
+/**
  * A usable employee code.
  *
  * Deliberately permissive. FinAtt generates `EMP-0001`, but an imported roster
@@ -275,20 +295,60 @@ export async function createEmployeeLogin(
     const employeeId = String(formData.get('employeeId') ?? '')
     if (!employeeId) return fail('Missing employee.')
 
-    const { data: employee, error: lookupError } = await supabase
-      .from('employees')
-      .select('id, email, full_name, user_id, department, designation, phone, intended_role')
-      .eq('id', employeeId)
-      .maybeSingle<{
-        id: string
-        email: string
-        full_name: string
-        user_id: string | null
-        department: string | null
-        designation: string | null
-        phone: string | null
-        intended_role: string | null
-      }>()
+    interface LoginTarget {
+      id: string
+      email: string
+      full_name: string
+      user_id: string | null
+      department: string | null
+      designation: string | null
+      phone: string | null
+      intended_role: string | null
+    }
+
+    const CORE_COLUMNS = 'id, email, full_name, user_id, department, designation, phone'
+
+    // intended_role arrives with migration 20260737. Selecting it on a database
+    // that has not run that migration fails the whole lookup with
+    // "column employees.intended_role does not exist", which blocked login
+    // creation entirely -- so fall back to the core columns and default the
+    // role, exactly as the CSV importer does for the matching insert.
+    const readCore = async () => {
+      const r = await supabase
+        .from('employees')
+        .select(CORE_COLUMNS)
+        .eq('id', employeeId)
+        .maybeSingle<Omit<LoginTarget, 'intended_role'>>()
+      return {
+        data: r.data ? ({ ...r.data, intended_role: null } as LoginTarget) : null,
+        error: r.error,
+      }
+    }
+
+    let employee: LoginTarget | null = null
+    let lookupError: { message: string } | null = null
+
+    if (intendedRoleColumnExists) {
+      const r = await supabase
+        .from('employees')
+        .select(`${CORE_COLUMNS}, intended_role`)
+        .eq('id', employeeId)
+        .maybeSingle<LoginTarget>()
+      employee = r.data
+      lookupError = r.error
+
+      if (lookupError && isMissingIntendedRole(lookupError.message)) {
+        // Remember, so no later request repeats this failure.
+        intendedRoleColumnExists = false
+        console.warn(
+          '[hr] employees.intended_role is missing — falling back for the rest of this ' +
+            'process. Apply migration 20260737000000_import_role_and_code.sql.',
+        )
+        ;({ data: employee, error: lookupError } = await readCore())
+      }
+    } else {
+      ;({ data: employee, error: lookupError } = await readCore())
+    }
 
     if (lookupError) return fail(lookupError.message)
     if (!employee) return fail('That employee no longer exists.')
@@ -477,25 +537,39 @@ export async function importEmployees(
       status: 'active',
     }))
 
-    let { error, count } = await supabase
-      .from('employees')
-      .insert(payload, { count: 'exact' })
+    const withoutRole = () =>
+      payload.map((p) => {
+        const row = { ...p } as Record<string, unknown>
+        delete row.intended_role
+        return row
+      })
 
     // intended_role arrives with 20260737. Until that migration is applied the
     // column does not exist and the whole insert fails, which would make the
     // importer look broken on any deployment that has not run it yet. Drop the
-    // field and retry -- the roster still imports, only the portal hint is lost.
-    if (error && /intended_role/i.test(error.message)) {
-      const stripped = payload.map(({ intended_role: _omit, ...rest }) => rest)
+    // field -- the roster still imports, only the portal hint is lost.
+    let error: { message: string } | null = null
+    let count: number | null = null
+
+    if (intendedRoleColumnExists) {
       ;({ error, count } = await supabase
         .from('employees')
-        .insert(stripped, { count: 'exact' }))
-      if (!error) {
+        .insert(payload, { count: 'exact' }))
+
+      if (error && isMissingIntendedRole(error.message)) {
+        intendedRoleColumnExists = false
         console.warn(
           '[importEmployees] intended_role column missing; roles were not stored. ' +
             'Apply migration 20260737000000_import_role_and_code.sql.',
         )
+        ;({ error, count } = await supabase
+          .from('employees')
+          .insert(withoutRole(), { count: 'exact' }))
       }
+    } else {
+      ;({ error, count } = await supabase
+        .from('employees')
+        .insert(withoutRole(), { count: 'exact' }))
     }
 
     if (error) {
@@ -1488,9 +1562,29 @@ export interface Member {
   account_status?: string | null
   last_login_at?: string | null
   login_count?: number | null
+  /**
+   * False for a roster row that has no login yet. Such a member has no profile,
+   * so `id` is their employees.id and every account action (portal, reset,
+   * remove) is meaningless until a login exists.
+   */
+  hasLogin?: boolean
+  /** Present only for roster rows: the employees.id to create a login against. */
+  employeeRowId?: string
+  employeeCode?: string | null
 }
 
-/** Every account, for the admin's role-assignment list. Admin-gated by RLS. */
+/**
+ * Everyone in the organisation, whether or not they can sign in.
+ *
+ * Two sources, because they answer different questions:
+ *  - `profiles` — people with an account. These carry a portal and a password.
+ *  - `employees` with no `user_id` — imported or hand-added roster rows. A CSV
+ *    import creates these and nothing else, so 119 imported staff previously
+ *    left this page showing a single administrator and no way to act on them.
+ *
+ * Roster rows are marked `hasLogin: false` and the UI offers "Create login"
+ * instead of the account controls.
+ */
 export async function listMembers(): Promise<ActionResult<Member[]>> {
   try {
     await requireRole('hr') // admin passes (is_hr superset); RLS returns rows only to admin
@@ -1498,16 +1592,51 @@ export async function listMembers(): Promise<ActionResult<Member[]>> {
     const query = (columns: string) =>
       supabase.from('profiles').select(columns).order('role').order('full_name')
 
+    let accounts: Member[] = []
     const { data, error } = await query(
       'id, full_name, email, role, account_status, last_login_at, login_count',
     )
-    if (!error) return { ok: true, data: (data ?? []) as unknown as Member[] }
+    if (!error) {
+      accounts = (data ?? []) as unknown as Member[]
+    } else {
+      // Sign-in tracking columns arrive with a later migration. Fall back to the
+      // core fields rather than showing the admin an empty list.
+      const retry = await query('id, full_name, email, role')
+      if (retry.error) return fail(retry.error.message)
+      accounts = (retry.data ?? []) as unknown as Member[]
+    }
 
-    // Sign-in tracking columns arrive with a later migration. Fall back to the
-    // core fields rather than showing the admin an empty list.
-    const retry = await query('id, full_name, email, role')
-    if (retry.error) return fail(retry.error.message)
-    return { ok: true, data: (retry.data ?? []) as unknown as Member[] }
+    accounts = accounts.map((m) => ({ ...m, hasLogin: true }))
+
+    // Roster rows without an account. Best-effort: this page is still useful
+    // if the employees read fails, so a failure degrades to accounts only.
+    const { data: roster, error: rosterError } = await supabase
+      .from('employees')
+      .select('id, full_name, email, employee_id, user_id, status')
+      .is('user_id', null)
+      .order('full_name')
+
+    if (rosterError) {
+      console.warn('[listMembers] roster lookup failed:', rosterError.message)
+      return { ok: true, data: accounts }
+    }
+
+    const claimed = new Set(accounts.map((a) => (a.email ?? '').toLowerCase()))
+
+    const pending: Member[] = (roster ?? [])
+      .filter((e) => !claimed.has(String(e.email ?? '').toLowerCase()))
+      .map((e) => ({
+        id: String(e.id),
+        employeeRowId: String(e.id),
+        employeeCode: (e.employee_id as string) ?? null,
+        full_name: (e.full_name as string) ?? '',
+        email: (e.email as string) ?? '',
+        role: 'employee',
+        account_status: (e.status as string) ?? null,
+        hasLogin: false,
+      }))
+
+    return { ok: true, data: [...accounts, ...pending] }
   } catch (err) {
     return toResult(err)
   }

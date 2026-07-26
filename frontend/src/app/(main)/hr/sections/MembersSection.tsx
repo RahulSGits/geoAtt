@@ -55,6 +55,7 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
   const [inviting, setInviting] = useState(false)
   const [removing, setRemoving] = useState<Member | null>(null)
   const [passwordFor, setPasswordFor] = useState<Member | null>(null)
+  const [creatingId, setCreatingId] = useState<string | null>(null)
   const toast = useToast()
   const router = useRouter()
 
@@ -84,6 +85,33 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
       toast.error(res.error)
     }
     setSavingId(null)
+  }
+
+  /**
+   * Give a roster row a sign-in account.
+   *
+   * The same action the Employees directory uses, surfaced here so an admin who
+   * has just imported a CSV can onboard from one place instead of hunting each
+   * person down in the other tab.
+   */
+  async function createLogin(member: Member) {
+    if (!member.employeeRowId) return
+    setCreatingId(member.id)
+
+    const fd = new FormData()
+    fd.set('employeeId', member.employeeRowId)
+    const res = await createEmployeeLogin(fd)
+
+    if (res.ok) {
+      toast.success(
+        `Login created for ${member.full_name || member.email}. Temporary password: ${res.data.password}`,
+      )
+      router.refresh()
+      await load()
+    } else {
+      toast.error(res.error)
+    }
+    setCreatingId(null)
   }
 
   async function resetPassword(member: Member) {
@@ -189,21 +217,42 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                 {shown.map((member) => {
                   // Guard the last admin in the UI too, matching the DB rule.
                   const lockLastAdmin = member.role === 'admin' && adminCount <= 1
+                  // A roster row with no account yet. Every control in this
+                  // table acts on a login, so they are all meaningless here —
+                  // the row offers "Create login" instead.
+                  const noLogin = member.hasLogin === false
                   return (
                     <tr key={member.id}>
                       <td>
                         <div className="flex items-center gap-2.5">
                           <Avatar name={member.full_name || member.email} size={30} />
                           <div className="min-w-0">
-                            <div className="truncate font-medium">
-                              {member.full_name || '—'}
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate font-medium">
+                                {member.full_name || '—'}
+                              </span>
+                              {member.employeeCode && (
+                                <span className="muted shrink-0 text-[10px] tabular-nums">
+                                  {member.employeeCode}
+                                </span>
+                              )}
                             </div>
                             <div className="muted truncate text-xs">{member.email}</div>
                           </div>
                         </div>
                       </td>
                       <td>
-                        {member.last_login_at ? (
+                        {noLogin ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                            style={{
+                              background: 'color-mix(in srgb, var(--warning) 16%, transparent)',
+                              color: 'var(--warning)',
+                            }}
+                          >
+                            No login yet
+                          </span>
+                        ) : member.last_login_at ? (
                           <span className="text-xs">
                             {formatDateTime(member.last_login_at)}
                           </span>
@@ -224,6 +273,7 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                               const Icon = r.icon
                               const disabled =
                                 !isAdmin ||
+                                noLogin ||
                                 savingId === member.id ||
                                 (lockLastAdmin && r.value !== 'admin')
                               return (
@@ -232,11 +282,13 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                                   onClick={() => assign(member, r.value)}
                                   disabled={disabled}
                                   title={
-                                    !isAdmin
-                                      ? 'Only an administrator can change portals'
-                                      : lockLastAdmin && r.value !== 'admin'
-                                        ? 'Promote someone else to admin first'
-                                        : `Set ${r.label}`
+                                    noLogin
+                                      ? 'Create a login first — a portal is assigned to an account'
+                                      : !isAdmin
+                                        ? 'Only an administrator can change portals'
+                                        : lockLastAdmin && r.value !== 'admin'
+                                          ? 'Promote someone else to admin first'
+                                          : `Set ${r.label}`
                                   }
                                   className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 cursor-pointer"
                                   style={
@@ -258,6 +310,22 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                         </td>
                       )}
                       <td>
+                        {noLogin ? (
+                          <button
+                            onClick={() => createLogin(member)}
+                            disabled={creatingId === member.id}
+                            title={`Create a sign-in account for ${member.email}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 cursor-pointer"
+                            style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                          >
+                            {creatingId === member.id ? (
+                              <Spinner size={12} />
+                            ) : (
+                              <KeyRound size={12} />
+                            )}
+                            Create login
+                          </button>
+                        ) : (
                         <div className="flex flex-wrap items-center gap-1.5">
                           <button
                             onClick={() => resetPassword(member)}
@@ -283,17 +351,20 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                             Set password
                           </button>
                         </div>
+                        )}
                       </td>
                       {isAdmin && (
                         <td className="text-right">
                           <button
                             onClick={() => setRemoving(member)}
-                            disabled={lockLastAdmin}
+                            disabled={lockLastAdmin || noLogin}
                             aria-label={`Delete ${member.full_name || member.email}`}
                             title={
-                              lockLastAdmin
-                                ? 'The last administrator cannot be removed'
-                                : 'Delete this account permanently'
+                              noLogin
+                                ? 'No account to remove — delete them from the Employees directory instead'
+                                : lockLastAdmin
+                                  ? 'The last administrator cannot be removed'
+                                  : 'Delete this account permanently'
                             }
                             className="icon-btn icon-btn-danger disabled:opacity-40"
                           >
