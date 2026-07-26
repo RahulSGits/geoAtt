@@ -114,6 +114,39 @@ function describeAuthError(error: {
 }
 
 /**
+ * Resolve an employee code (EMP-0001, ND33563) to the address on that row.
+ *
+ * The `email_for_login` SECURITY DEFINER function does this in Postgres and is
+ * granted to anon; this is the same lookup for deployments that have not run
+ * that migration. It uses the service key because the caller is not signed in
+ * and the employees policies correctly return nothing to an anonymous reader.
+ *
+ * Silent on failure by design: a miss falls through to the normal sign-in,
+ * which answers with the same generic message as a wrong password, so this
+ * cannot be used to discover which employee codes exist.
+ */
+async function emailForEmployeeCode(identifier: string): Promise<string | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null
+
+  try {
+    const admin = createStatelessClient(url, key, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+    const { data } = await admin
+      .from('employees')
+      .select('email')
+      .ilike('employee_id', identifier.trim())
+      .maybeSingle<{ email: string | null }>()
+
+    return data?.email ? data.email.toLowerCase() : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * True when this address is on the employee roster but has no login attached.
  *
  * Uses the service-role key rather than the request's client: the caller is not
@@ -169,8 +202,20 @@ export async function login(formData: FormData): Promise<AuthActionState> {
   // "not recognised" message as a wrong password, so this cannot be used to
   // discover which employee IDs exist.
   if (!identifier.includes('@')) {
-    const { data: resolved } = await supabase.rpc('email_for_login', { identifier })
-    if (typeof resolved === 'string' && resolved) email = resolved.toLowerCase()
+    const { data: resolved, error: rpcError } = await supabase.rpc('email_for_login', {
+      identifier,
+    })
+
+    if (typeof resolved === 'string' && resolved) {
+      email = resolved.toLowerCase()
+    } else if (rpcError) {
+      // email_for_login ships with 20260732. Without it, signing in by employee
+      // ID fails for everyone — the identifier is used verbatim as an email and
+      // never matches. Resolve it here instead so the documented "sign in with
+      // EMP-0001 or ND33563" behaviour works on any deployment.
+      const fallback = await emailForEmployeeCode(identifier)
+      if (fallback) email = fallback
+    }
   }
 
   let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data']

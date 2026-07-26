@@ -449,6 +449,13 @@ function EmployeeForm({
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Full name" name="fullName" required defaultValue={employee?.full_name} />
+        <Field
+          label="Employee ID"
+          name="employeeCode"
+          required
+          defaultValue={employee?.employee_id ?? ''}
+          hint="Their code from your own system, e.g. ND33563. Must be unique — FinAtt no longer invents one."
+        />
         {mode === 'create' ? (
           <Field label="Email" name="email" type="email" required />
         ) : (
@@ -608,14 +615,18 @@ function Field({
   type = 'text',
   required,
   defaultValue,
+  hint,
 }: {
   label: string
   name: string
   type?: string
   required?: boolean
   defaultValue?: string
+  /** Short guidance under the input, for fields whose format is not obvious. */
+  hint?: string
 }) {
   const id = `ef-${name}`
+  const hintId = hint ? `${id}-hint` : undefined
   return (
     <div>
       <label className="label" htmlFor={id}>
@@ -628,8 +639,14 @@ function Field({
         type={type}
         required={required}
         defaultValue={defaultValue}
+        aria-describedby={hintId}
         className="field"
       />
+      {hint && (
+        <p id={hintId} className="muted mt-1 text-xs">
+          {hint}
+        </p>
+      )}
     </div>
   )
 }

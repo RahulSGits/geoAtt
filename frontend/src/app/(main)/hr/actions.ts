@@ -169,6 +169,7 @@ function readEmployeeInput(formData: FormData): EmployeeInput {
   return {
     email: String(formData.get('email') ?? '').trim().toLowerCase(),
     fullName: String(formData.get('fullName') ?? '').trim(),
+    employeeId: String(formData.get('employeeCode') ?? '').trim(),
     phone: String(formData.get('phone') ?? '').trim(),
     department: String(formData.get('department') ?? '').trim(),
     designation: String(formData.get('designation') ?? '').trim(),
@@ -182,21 +183,15 @@ function readEmployeeInput(formData: FormData): EmployeeInput {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-/** Next sequential employee code, e.g. EMP-0007. */
-async function nextEmployeeCode(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  offset = 0,
-): Promise<string> {
-  const { data } = await supabase
-    .from('employees')
-    .select('employee_id')
-    .order('employee_id', { ascending: false })
-    .limit(1)
-    .maybeSingle<{ employee_id: string }>()
-
-  const highest = Number((data?.employee_id ?? '').replace(/\D/g, '')) || 0
-  return `EMP-${String(highest + 1 + offset).padStart(4, '0')}`
-}
+// A next-sequential-code generator (`EMP-0007`) lived here. Removed with the
+// last caller: employee codes are now always supplied, by the CSV or by the
+// form.
+//
+// It was also wrong. `order('employee_id')` is a TEXT sort, so with mixed
+// prefixes the "highest" row was the lexicographic max — on this roster
+// "ND33568" outranks every "EMP-…" — and the digits were then stripped out of
+// whichever row won. That produced EMP-33577 from a roster numbered ND33xxx,
+// and on a differently-shaped roster it could re-issue a code already in use.
 
 /**
  * Create an employee record.
@@ -217,6 +212,16 @@ export async function createEmployee(formData: FormData): Promise<ActionResult> 
     if (!input.fullName) return fail('Enter the employee\'s full name.')
     if (!EMAIL_RE.test(input.email)) return fail('Enter a valid email address.')
 
+    // Supplied, never generated. See the note in importEmployees: an invented
+    // code matches nothing in the system the roster actually comes from.
+    const code = (input.employeeId ?? '').trim().toUpperCase()
+    if (!code) return fail('Enter their Employee ID.')
+    if (!EMPLOYEE_CODE_RE.test(code)) {
+      return fail(
+        'Employee ID must be up to 32 characters — letters, digits, . _ / or - and no spaces.',
+      )
+    }
+
     const { data: clash } = await supabase
       .from('employees')
       .select('id')
@@ -225,8 +230,18 @@ export async function createEmployee(formData: FormData): Promise<ActionResult> 
 
     if (clash) return fail('An employee with that email already exists.')
 
+    const { data: codeClash } = await supabase
+      .from('employees')
+      .select('full_name')
+      .ilike('employee_id', code)
+      .maybeSingle<{ full_name: string }>()
+
+    if (codeClash) {
+      return fail(`Employee ID ${code} is already used by ${codeClash.full_name}.`)
+    }
+
     const { error } = await supabase.from('employees').insert({
-      employee_id: await nextEmployeeCode(supabase),
+      employee_id: code,
       full_name: input.fullName,
       email: input.email,
       phone: input.phone || null,
@@ -418,7 +433,13 @@ export async function importEmployees(
         skipped.push({ email, reason: 'Missing name' })
       } else if (taken.has(email)) {
         skipped.push({ email, reason: 'Already on the roster' })
-      } else if (code && !EMPLOYEE_CODE_RE.test(code)) {
+      } else if (!code) {
+        // Deliberately NOT auto-generated. Inventing "EMP-33577" for a row whose
+        // file had no code produces an id that matches nothing in the system the
+        // roster came from, and nobody notices until someone tries to reconcile.
+        // Better to name the row and let the file be corrected.
+        skipped.push({ email, reason: 'No Employee ID in the file — add one and re-import' })
+      } else if (!EMPLOYEE_CODE_RE.test(code)) {
         skipped.push({
           email,
           reason:
@@ -444,26 +465,10 @@ export async function importEmployees(
       return { ok: true, data: { created: 0, skipped } }
     }
 
-    // Codes are allocated up front so the batch stays contiguous. Rows that
-    // brought their own code keep it, and the generator steps over anything
-    // already claimed -- by the roster or by an earlier row in this same file --
-    // so a supplied EMP-0007 cannot collide with a generated one.
-    const base = await nextEmployeeCode(supabase)
-    let next = Number(base.replace(/\D/g, '')) || 1
-
-    const allocate = (): string => {
-      let code = `EMP-${String(next).padStart(4, '0')}`
-      while (codesTaken.has(code)) {
-        next += 1
-        code = `EMP-${String(next).padStart(4, '0')}`
-      }
-      next += 1
-      codesTaken.add(code)
-      return code
-    }
-
+    // Every surviving row brought its own code -- rows without one were skipped
+    // above rather than given a generated EMP-000n.
     const payload = valid.map((row) => ({
-      employee_id: row.employeeId || allocate(),
+      employee_id: row.employeeId,
       full_name: row.fullName,
       email: row.email,
       phone: row.phone || null,
@@ -602,9 +607,32 @@ export async function updateEmployee(formData: FormData): Promise<ActionResult> 
     const fullName = String(formData.get('fullName') ?? '').trim()
     if (!fullName) return fail('Name cannot be empty.')
 
+    // Employee ID is editable, because the importer can no longer invent one
+    // and a code carried over from another system may need correcting. It is
+    // NOT NULL and unique in the schema, so both are checked before writing.
+    const code = String(formData.get('employeeCode') ?? '').trim().toUpperCase()
+    if (!code) return fail('Employee ID cannot be empty.')
+    if (!EMPLOYEE_CODE_RE.test(code)) {
+      return fail(
+        'Employee ID must be up to 32 characters — letters, digits, . _ / or - and no spaces.',
+      )
+    }
+
+    const { data: clash } = await supabase
+      .from('employees')
+      .select('id, full_name')
+      .ilike('employee_id', code)
+      .neq('id', id)
+      .maybeSingle<{ id: string; full_name: string }>()
+
+    if (clash) {
+      return fail(`Employee ID ${code} is already used by ${clash.full_name}.`)
+    }
+
     const { error } = await supabase
       .from('employees')
       .update({
+        employee_id: code,
         full_name: fullName,
         phone: String(formData.get('phone') ?? '').trim() || null,
         department: String(formData.get('department') ?? '').trim() || null,
@@ -2069,13 +2097,55 @@ export async function getMemberImpact(
     const supabase = await createClient()
 
     const { data, error } = await supabase.rpc('member_delete_impact', { target: memberId })
-    if (error) {
-      return fail(
-        /member_delete_impact/i.test(error.message)
-          ? 'Account deletion is not set up on this deployment yet. Run the account-deletion migration.'
-          : error.message,
-      )
+
+    // member_delete_impact ships with 20260735. Compute the same counts here
+    // where it is absent, so the dialog can still state what will be lost
+    // instead of refusing to open.
+    if (error && /member_delete_impact|function .* does not exist|PGRST202/i.test(error.message)) {
+      const session = await requireRole('hr')
+      const admin = adminClient()
+      if (!admin) return fail(SERVICE_KEY_HELP)
+
+      const { data: victim } = await admin
+        .from('profiles')
+        .select('full_name, email, role')
+        .eq('id', memberId)
+        .maybeSingle<{ full_name: string; email: string; role: string }>()
+
+      if (!victim) return fail('That member no longer exists.')
+
+      const { data: emp } = await admin
+        .from('employees')
+        .select('id')
+        .eq('user_id', memberId)
+        .maybeSingle<{ id: string }>()
+
+      const [att, lv, admins] = await Promise.all([
+        emp
+          ? admin.from('attendance').select('id', { count: 'exact', head: true }).eq('employee_id', emp.id)
+          : Promise.resolve({ count: 0 }),
+        emp
+          ? admin.from('leaves').select('id', { count: 'exact', head: true }).eq('employee_id', emp.id)
+          : Promise.resolve({ count: 0 }),
+        admin.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'admin'),
+      ])
+
+      return {
+        ok: true,
+        data: {
+          full_name: victim.full_name,
+          email: victim.email,
+          role: victim.role,
+          attendance: att.count ?? 0,
+          leaves: lv.count ?? 0,
+          has_employee_row: Boolean(emp),
+          is_self: memberId === session.userId,
+          last_admin: victim.role === 'admin' && (admins.count ?? 0) <= 1,
+        } as MemberImpact,
+      }
     }
+
+    if (error) return fail(error.message)
     return { ok: true, data: data as MemberImpact }
   } catch (err) {
     return toResult(err)
@@ -2120,13 +2190,52 @@ export async function deleteMember(
     )
 
     const { data, error } = await supabase.rpc('delete_member_account', { target: memberId })
-    if (error) {
-      return fail(
-        /delete_member_account/i.test(error.message)
-          ? 'Account deletion is not set up on this deployment yet. Run the account-deletion migration.'
-          : error.message,
+
+    // delete_member_account ships with 20260735. Same work in the application
+    // where it is absent, keeping its three rules: admin only, never yourself,
+    // never the last administrator.
+    if (error && /delete_member_account|function .* does not exist|PGRST202/i.test(error.message)) {
+      console.warn(
+        '[deleteMember] delete_member_account missing; using the application path. ' +
+          'Apply 20260735000000_account_deletion.sql for database-side enforcement.',
       )
+
+      if (session.role !== 'admin') return fail('Only an administrator can remove an account.')
+      if (memberId === session.userId) return fail('You cannot delete your own account.')
+
+      const admin = adminClient()
+      if (!admin) return fail(SERVICE_KEY_HELP)
+
+      const { data: victim } = await admin
+        .from('profiles')
+        .select('full_name, role')
+        .eq('id', memberId)
+        .maybeSingle<{ full_name: string; role: string }>()
+
+      if (!victim) return fail('That member no longer exists.')
+
+      if (victim.role === 'admin') {
+        const { count } = await admin
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', 'admin')
+        if ((count ?? 0) <= 1) {
+          return fail('The last administrator cannot be removed. Promote someone else first.')
+        }
+      }
+
+      // Login first — deleting auth.users cascades to profiles and employees.
+      const state = await deleteAuthUser(memberId)
+      if (state === 'failed') {
+        return fail('Their sign-in could not be removed, so nothing was deleted.')
+      }
+      await admin.from('profiles').delete().eq('id', memberId)
+
+      refresh()
+      return { ok: true, data: { name: victim.full_name, login: state } }
     }
+
+    if (error) return fail(error.message)
 
     const outcome = (data ?? {}) as { full_name?: string; auth_user_state?: string }
     let login = outcome.auth_user_state ?? 'none'
