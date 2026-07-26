@@ -5,6 +5,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/server'
 import { AuthError, requireRole, type Session } from '@/lib/auth'
 import { requirePassword } from '@/lib/reauth'
+import { isProtectedAccount } from '@/lib/protectedAccounts'
 import {
   emailConfigured,
   EMAIL_SETUP_HELP,
@@ -1329,11 +1330,20 @@ export async function deleteEmployee(
 
     const { data: employee } = await supabase
       .from('employees')
-      .select('full_name, user_id')
+      .select('full_name, user_id, email')
       .eq('id', id)
-      .maybeSingle<{ full_name: string; user_id: string | null }>()
+      .maybeSingle<{ full_name: string; user_id: string | null; email: string | null }>()
 
     if (!employee) return fail('That employee no longer exists.')
+
+    // The roster is the other route to deleting an account, so the lock has to
+    // hold here too — otherwise a protected admin who also has an employees row
+    // could be removed from the directory instead.
+    if (isProtectedAccount(employee.email)) {
+      return fail(
+        'That account is locked and cannot be deleted. Remove it from PROTECTED_ACCOUNTS first.',
+      )
+    }
 
     // Typed-name confirmation: this is unrecoverable from the UI.
     const typed = String(formData.get('confirmName') ?? '').trim()
@@ -1580,6 +1590,8 @@ export interface Member {
   /** Present only for roster rows: the employees.id to create a login against. */
   employeeRowId?: string
   employeeCode?: string | null
+  /** Listed in PROTECTED_ACCOUNTS: cannot be demoted, reset or deleted. */
+  isProtected?: boolean
 }
 
 /**
@@ -1615,7 +1627,13 @@ export async function listMembers(): Promise<ActionResult<Member[]>> {
       accounts = (retry.data ?? []) as unknown as Member[]
     }
 
-    accounts = accounts.map((m) => ({ ...m, hasLogin: true }))
+    // The list itself stays server-side; the UI only learns which rows are
+    // locked, never which addresses are on it.
+    accounts = accounts.map((m) => ({
+      ...m,
+      hasLogin: true,
+      isProtected: isProtectedAccount(m.email),
+    }))
 
     // Roster rows without an account. Best-effort: this page is still useful
     // if the employees read fails, so a failure degrades to accounts only.
@@ -1686,6 +1704,13 @@ async function requireManageTarget(
   if (!data) throw new AuthError('That member no longer exists.')
   if (data.role !== 'employee' && session.role !== 'admin') {
     throw new AuthError('Only an administrator can manage an HR or admin account.')
+  }
+  // A locked account may still manage itself -- otherwise the owner could not
+  // change their own password -- but nobody else may touch it.
+  if (isProtectedAccount(data.email) && data.id !== session.userId) {
+    throw new AuthError(
+      'That account is locked. Remove it from PROTECTED_ACCOUNTS to manage it.',
+    )
   }
   return data
 }
@@ -2003,6 +2028,20 @@ export async function setMemberRole(formData: FormData): Promise<ActionResult> {
     if (!target) return fail('Missing member.')
     if (!['admin', 'hr', 'employee'].includes(role)) return fail('Pick a valid portal.')
 
+    // Locked accounts keep their portal. Checked before the RPC so the rule
+    // holds whether or not set_member_role exists on this deployment.
+    const { data: subject } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('id', target)
+      .maybeSingle<{ email: string }>()
+
+    if (isProtectedAccount(subject?.email)) {
+      return fail(
+        'That account is locked and its portal cannot be changed. Remove it from PROTECTED_ACCOUNTS first.',
+      )
+    }
+
     const { error } = await supabase.rpc('set_member_role', { target, new_role: role })
 
     // set_member_role ships with 20260731. Where it is absent, do the same work
@@ -2181,6 +2220,21 @@ export async function deleteMember(
     const typed = String(formData.get('confirmEmail') ?? '').trim().toLowerCase()
     if (typed !== expectedEmail) {
       return fail('The email you typed does not match. Nothing was deleted.')
+    }
+
+    // Locked accounts cannot be removed by anyone, including their owner and
+    // any other administrator. Resolved from the id, not the posted address,
+    // so a forged form cannot rename the target past this check.
+    const { data: subject } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('id', memberId)
+      .maybeSingle<{ email: string }>()
+
+    if (isProtectedAccount(subject?.email)) {
+      return fail(
+        'That account is locked and cannot be deleted. Remove it from PROTECTED_ACCOUNTS first.',
+      )
     }
 
     await requirePassword(

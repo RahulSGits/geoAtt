@@ -286,6 +286,10 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                   // table acts on a login, so they are all meaningless here —
                   // the row offers "Create login" instead.
                   const noLogin = member.hasLogin === false
+                  // Listed in PROTECTED_ACCOUNTS. Every control on the row is
+                  // inert; the server refuses regardless, this just stops the
+                  // click looking like it might work.
+                  const locked = member.isProtected === true
                   return (
                     <tr key={member.id}>
                       <td>
@@ -299,6 +303,19 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                               {member.employeeCode && (
                                 <span className="muted shrink-0 text-[10px] tabular-nums">
                                   {member.employeeCode}
+                                </span>
+                              )}
+                              {locked && (
+                                <span
+                                  title="Locked: cannot be demoted, reset or deleted"
+                                  className="inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                  style={{
+                                    background:
+                                      'color-mix(in srgb, var(--primary) 14%, transparent)',
+                                    color: 'var(--primary)',
+                                  }}
+                                >
+                                  <Lock size={9} /> Locked
                                 </span>
                               )}
                             </div>
@@ -338,6 +355,7 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                               const Icon = r.icon
                               const disabled =
                                 !isAdmin ||
+                                locked ||
                                 savingId === member.id ||
                                 (lockLastAdmin && r.value !== 'admin')
                               return (
@@ -346,13 +364,15 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                                   onClick={() => assign(member, r.value)}
                                   disabled={disabled}
                                   title={
-                                    !isAdmin
-                                      ? 'Only an administrator can change portals'
-                                      : lockLastAdmin && r.value !== 'admin'
-                                        ? 'Promote someone else to admin first'
-                                        : noLogin
-                                          ? `Create their login and set ${r.label}`
-                                          : `Set ${r.label}`
+                                    locked
+                                      ? 'This account is locked — its portal cannot be changed'
+                                      : !isAdmin
+                                        ? 'Only an administrator can change portals'
+                                        : lockLastAdmin && r.value !== 'admin'
+                                          ? 'Promote someone else to admin first'
+                                          : noLogin
+                                            ? `Create their login and set ${r.label}`
+                                            : `Set ${r.label}`
                                   }
                                   className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 cursor-pointer"
                                   style={
@@ -393,8 +413,12 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                         <div className="flex flex-wrap items-center gap-1.5">
                           <button
                             onClick={() => resetPassword(member)}
-                            disabled={resetId === member.id}
-                            title={`Email ${member.email} a link to choose a new password`}
+                            disabled={resetId === member.id || locked}
+                            title={
+                              locked
+                                ? 'This account is locked — only its owner can change its password'
+                                : `Email ${member.email} a link to choose a new password`
+                            }
                             className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 cursor-pointer"
                             style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
                           >
@@ -407,7 +431,12 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                           </button>
                           <button
                             onClick={() => setPasswordFor(member)}
-                            title={`Set a new password for ${member.email} yourself`}
+                            disabled={locked}
+                            title={
+                              locked
+                                ? 'This account is locked — only its owner can change its password'
+                                : `Set a new password for ${member.email} yourself`
+                            }
                             className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer"
                             style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
                           >
@@ -421,14 +450,16 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
                         <td className="text-right">
                           <button
                             onClick={() => setRemoving(member)}
-                            disabled={lockLastAdmin || noLogin}
+                            disabled={lockLastAdmin || noLogin || locked}
                             aria-label={`Delete ${member.full_name || member.email}`}
                             title={
-                              noLogin
-                                ? 'No account to remove — delete them from the Employees directory instead'
-                                : lockLastAdmin
-                                  ? 'The last administrator cannot be removed'
-                                  : 'Delete this account permanently'
+                              locked
+                                ? 'This account is locked and cannot be deleted'
+                                : noLogin
+                                  ? 'No account to remove — delete them from the Employees directory instead'
+                                  : lockLastAdmin
+                                    ? 'The last administrator cannot be removed'
+                                    : 'Delete this account permanently'
                             }
                             className="icon-btn icon-btn-danger disabled:opacity-40"
                           >
