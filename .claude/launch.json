@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "finatt-web",
+      "//": "Plain `bash -c`, not `-lc`: a login shell runs profile scripts first and, when the launcher's inherited cwd is unreadable, floods stderr with getcwd/chdir errors that bury the real failure.",
+      "//autoPort": "3000 is held by the FinBud-LiveKit dev server, so take any free port. The dev script is `next dev -H 0.0.0.0` with no -p flag, which lets Next pick up the PORT env var the launcher assigns. NOTE: Supabase only redirects to allow-listed origins, so sign-in stays broken on a non-3000 port until NEXT_PUBLIC_SITE_URL and the Supabase redirect allowlist are updated to match.",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/rahul/Downloads/FinAtt/frontend && exec npm run dev"
+      ],
+      "autoPort": true,
+      "port": 3000
+    }
+  ]
+}

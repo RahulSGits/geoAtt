@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Flutter/Dart build artifacts (also covered by app/.gitignore)
+app/build/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/android/local.properties
+app/ios/Pods/
+app/ios/.symlinks/
+app/ios/Flutter/ephemeral/
+
+# Node (web + server) — never commit dependencies or build output
+**/node_modules/
+web/.next/
+web/out/
+server/dist/
+web/build/web/
+
+# Flutter web build (preview)
+app/build/web/
+
+# Supabase local
+supabase/.branches
+supabase/.temp
+
+# Env / secrets (never commit real keys)
+**/.env
+**/.env.*
+!**/.env.example

@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+prisma
+opencv-python-headless
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+pydantic[email]
+websockets
+numpy
+python-dotenv

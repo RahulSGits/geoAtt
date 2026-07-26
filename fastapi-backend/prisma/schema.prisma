@@ -1,0 +1,529 @@
+// GeoSelfie Enterprise — multi-tenant workforce & attendance data model.
+// Every business table carries companyId for hard tenant isolation.
+
+generator client {
+  provider = "prisma-client-py"
+  interface = "asyncio"
+  recursive_type_depth = 5
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  HR
+  MANAGER
+  TEAM_LEAD
+  EMPLOYEE
+  AUDITOR
+}
+
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  BUSINESS
+  ENTERPRISE
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  INVITED
+}
+
+enum EmployeeStatus {
+  ONBOARDING
+  ACTIVE
+  INACTIVE
+  EXITED
+}
+
+enum ShiftType {
+  FIXED
+  FLEXIBLE
+  NIGHT
+  ROTATIONAL
+  SPLIT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  ON_LEAVE
+  HOLIDAY
+  WEEKLY_OFF
+  PENDING
+}
+
+enum AttendanceSource {
+  MOBILE
+  WEB
+  KIOSK
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum CorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum HolidayType {
+  PUBLIC
+  COMPANY
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
+enum NotificationType {
+  ATTENDANCE
+  LEAVE
+  APPROVAL
+  ANNOUNCEMENT
+  SECURITY
+  SYSTEM
+}
+
+// ---------------------------------------------------------------------------
+// Tenant
+// ---------------------------------------------------------------------------
+
+model Company {
+  id           String           @id @default(uuid())
+  name         String
+  slug         String           @unique // used for Company-ID login
+  logoUrl      String?
+  timezone     String           @default("UTC")
+  plan         SubscriptionPlan @default(FREE)
+  seats        Int              @default(25)
+  isActive     Boolean          @default(true)
+  brandColor   String?          // white-label theming
+  settings     Json             @default("{}") // per-company attendance policy
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  users        User[]
+  employees    Employee[]
+  branches     Branch[]
+  departments  Department[]
+  designations Designation[]
+  sites        Site[]
+  shifts       Shift[]
+  leaveTypes   LeaveType[]
+  holidays     Holiday[]
+  announcements Announcement[]
+
+  @@index([slug])
+}
+
+// ---------------------------------------------------------------------------
+// Identity & access
+// ---------------------------------------------------------------------------
+
+model User {
+  id              String     @id @default(uuid())
+  companyId       String
+  company         Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email           String
+  phone           String?
+  passwordHash    String
+  role            Role       @default(EMPLOYEE)
+  status          UserStatus @default(ACTIVE)
+  mfaEnabled      Boolean    @default(false)
+  mfaSecret       String?
+  lastLoginAt     DateTime?
+  failedLoginCount Int       @default(0)
+  lockedUntil     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  employee        Employee?
+  refreshTokens   RefreshToken[]
+  devices         Device[]
+  notifications   Notification[]
+
+  @@unique([companyId, email])
+  @@index([companyId])
+}
+
+model RefreshToken {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash       String    @unique
+  deviceId        String?
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  replacedByToken String?   // rotation chain
+  createdAt       DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Device {
+  id           String         @id @default(uuid())
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId    String
+  hardwareId   String
+  platform     DevicePlatform
+  model        String?
+  pushToken    String?
+  isTrusted    Boolean        @default(false)
+  isRooted     Boolean        @default(false)
+  boundAt      DateTime       @default(now())
+  lastSeenAt   DateTime       @default(now())
+
+  @@unique([userId, hardwareId])
+  @@index([companyId])
+}
+
+// ---------------------------------------------------------------------------
+// Org structure
+// ---------------------------------------------------------------------------
+
+model Branch {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  code      String?
+  address   String?
+  timezone  String   @default("UTC")
+  createdAt DateTime @default(now())
+
+  departments Department[]
+  employees   Employee[]
+  sites       Site[]
+
+  @@index([companyId])
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  name      String
+  code      String?
+  parentId  String?
+  parent    Department? @relation("DeptTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Department[] @relation("DeptTree")
+  createdAt DateTime @default(now())
+
+  employees Employee[]
+
+  @@index([companyId])
+}
+
+model Designation {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title     String
+  grade     String?
+  createdAt DateTime @default(now())
+
+  employees Employee[]
+
+  @@index([companyId])
+}
+
+model Site {
+  id                String   @id @default(uuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branchId          String?
+  branch            Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  name              String
+  latitude          Float
+  longitude         Float
+  radiusMeters      Float    @default(150)
+  indoorBufferMeters Float   @default(25) // GPS drift / indoor tolerance
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  employees         Employee[]
+  sessions          AttendanceSession[]
+
+  @@index([companyId])
+}
+
+// ---------------------------------------------------------------------------
+// Shifts & policy
+// ---------------------------------------------------------------------------
+
+model Shift {
+  id                 String    @id @default(uuid())
+  companyId          String
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name               String
+  type               ShiftType @default(FIXED)
+  startTime          String    // "HH:mm"
+  endTime            String    // "HH:mm"
+  graceMinutes       Int       @default(10)
+  breakMinutes       Int       @default(60)
+  minHalfDayMinutes  Int       @default(240)
+  minFullDayMinutes  Int       @default(480)
+  overtimeAfterMinutes Int     @default(540)
+  minPresencePercent Float     @default(0.5)
+  workdays           Int[]     @default([1, 2, 3, 4, 5]) // ISO weekday numbers
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+
+  employees          Employee[]
+
+  @@index([companyId])
+}
+
+// ---------------------------------------------------------------------------
+// People
+// ---------------------------------------------------------------------------
+
+model Employee {
+  id             String         @id @default(uuid())
+  companyId      String
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId         String?        @unique
+  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  employeeCode   String
+  firstName      String
+  lastName       String
+  departmentId   String?
+  department     Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  designationId  String?
+  designation    Designation?   @relation(fields: [designationId], references: [id], onDelete: SetNull)
+  branchId       String?
+  branch         Branch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  siteId         String?
+  site           Site?          @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  shiftId        String?
+  shift          Shift?         @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  managerId      String?
+  manager        Employee?      @relation("Reports", fields: [managerId], references: [id], onDelete: SetNull)
+  reports        Employee[]     @relation("Reports")
+  phone          String?
+  photoUrl       String?
+  dateOfJoining  DateTime?
+  dateOfBirth    DateTime?
+  salaryGrade    String?
+  emergencyContact Json?
+  bankDetails    Json?          // stored encrypted at app layer
+  faceEnrolled   Boolean        @default(false)
+  faceSignature  Json?
+  qrCode         String?
+  status         EmployeeStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  sessions       AttendanceSession[]
+  days           AttendanceDay[]
+  leaveRequests  LeaveRequest[]
+  corrections    AttendanceCorrection[]
+
+  @@unique([companyId, employeeCode])
+  @@index([companyId])
+  @@index([departmentId])
+  @@index([managerId])
+}
+
+// ---------------------------------------------------------------------------
+// Attendance
+// ---------------------------------------------------------------------------
+
+model AttendanceSession {
+  id                 String           @id @default(uuid())
+  companyId          String
+  employeeId         String
+  employee           Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  siteId             String?
+  site               Site?            @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  date               DateTime         @db.Date
+  checkInAt          DateTime
+  checkOutAt         DateTime?
+  checkInLat         Float
+  checkInLng         Float
+  checkInAccuracy    Float?
+  checkOutLat        Float?
+  checkOutLng        Float?
+  selfieUrl          String?
+  faceVerified       Boolean          @default(false)
+  livenessPassed     Boolean          @default(false)
+  insideGeofence     Boolean          @default(true)
+  mockLocationFlag   Boolean          @default(false)
+  source             AttendanceSource @default(MOBILE)
+  deviceId           String?
+  createdAt          DateTime         @default(now())
+
+  @@index([companyId, employeeId, date])
+  @@index([date])
+}
+
+model AttendanceDay {
+  id                 String           @id @default(uuid())
+  companyId          String
+  employeeId         String
+  employee           Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date               DateTime         @db.Date
+  firstInAt          DateTime?
+  lastOutAt          DateTime?
+  totalPresentSeconds Int             @default(0)
+  overtimeSeconds    Int              @default(0)
+  lateMinutes        Int              @default(0)
+  earlyLeaveMinutes  Int              @default(0)
+  status             AttendanceStatus @default(PENDING)
+  isLocked           Boolean          @default(false)
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([companyId, employeeId, date])
+  @@index([companyId, date])
+}
+
+model AttendanceCorrection {
+  id           String           @id @default(uuid())
+  companyId    String
+  employeeId   String
+  employee     Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date         DateTime         @db.Date
+  requestedIn  DateTime?
+  requestedOut DateTime?
+  reason       String
+  status       CorrectionStatus @default(PENDING)
+  approverId   String?
+  decidedAt    DateTime?
+  createdAt    DateTime         @default(now())
+
+  @@index([companyId, employeeId])
+}
+
+// ---------------------------------------------------------------------------
+// Leave & holidays
+// ---------------------------------------------------------------------------
+
+model LeaveType {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  code        String?
+  paid        Boolean  @default(true)
+  annualQuota Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  requests    LeaveRequest[]
+
+  @@index([companyId])
+}
+
+model LeaveRequest {
+  id          String      @id @default(uuid())
+  companyId   String
+  employeeId  String
+  employee    Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId String?
+  leaveType   LeaveType?  @relation(fields: [leaveTypeId], references: [id], onDelete: SetNull)
+  startDate   DateTime    @db.Date
+  endDate     DateTime    @db.Date
+  days        Float       @default(1)
+  reason      String?
+  status      LeaveStatus @default(PENDING)
+  approverId  String?
+  decidedAt   DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@index([companyId, employeeId])
+}
+
+model Holiday {
+  id        String      @id @default(uuid())
+  companyId String
+  company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branchId  String?
+  date      DateTime    @db.Date
+  name      String
+  type      HolidayType @default(PUBLIC)
+
+  @@index([companyId, date])
+}
+
+// ---------------------------------------------------------------------------
+// Comms, audit & compliance
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id        String           @id @default(uuid())
+  companyId String
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  type      NotificationType @default(SYSTEM)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+}
+
+model Announcement {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+}
+
+// Append-only audit trail (immutability enforced at the service/DB-grant layer).
+model AuditLog {
+  id        String   @id @default(uuid())
+  companyId String?
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([entity, entityId])
+}
+
+model LoginHistory {
+  id        String   @id @default(uuid())
+  companyId String?
+  userId    String?
+  email     String
+  success   Boolean
+  reason    String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([companyId])
+}
