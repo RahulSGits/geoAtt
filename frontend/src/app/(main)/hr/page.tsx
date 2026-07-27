@@ -7,6 +7,7 @@ import { localDateKey } from '@/lib/format'
 import { usingSandboxSender } from '@/lib/email'
 import HrDashboardClient from './HrDashboardClient'
 import { describeServiceKey, serviceKeyState, serviceKeyUsable } from '@/lib/serviceKey'
+import { myAvatarUrl } from '../avatar-actions'
 import type {
   Announcement,
   AttendanceWithEmployee,
@@ -147,6 +148,7 @@ export default async function HrPage() {
         designation: session.profile?.designation ?? null,
         role: session.role,
         firstLogin: session.profile?.password_created === false,
+        avatarUrl: await myAvatarUrl(),
       }}
       employees={employees}
       attendance={(attendanceRes.data ?? []) as AttendanceWithEmployee[]}

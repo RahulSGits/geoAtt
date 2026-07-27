@@ -29,6 +29,7 @@ import LiveClock from '@/components/LiveClock'
 import SetupGuide from '@/components/SetupGuide'
 import { useRealtimeNotifications } from '@/lib/useRealtimeNotifications'
 import ChangePassword from '@/components/ChangePassword'
+import ProfilePicture from '@/components/ProfilePicture'
 import DiagnosticsSection, { type DiagnosticsData } from './sections/DiagnosticsSection'
 import {
   AttendanceTrend,
@@ -97,6 +98,8 @@ export default function HrDashboardClient({
     designation: string | null
     role: string
     firstLogin: boolean
+    /** Signed URL for their profile picture, resolved on the server. */
+    avatarUrl?: string | null
   }
   employees: EmployeeWithAssignment[]
   attendance: AttendanceWithEmployee[]
@@ -614,6 +617,8 @@ function MyProfileSection({
     designation: string | null
     role: string
     firstLogin: boolean
+    /** Signed URL for their profile picture, resolved on the server. */
+    avatarUrl?: string | null
   }
 }) {
   const [saving, setSaving] = useState(false)
