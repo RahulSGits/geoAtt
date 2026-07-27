@@ -1669,6 +1669,108 @@ export async function listMembers(): Promise<ActionResult<Member[]>> {
   }
 }
 
+export interface BulkLoginResult {
+  created: number
+  skipped: { email: string; reason: string }[]
+  /** Roster rows still without a login after this run. */
+  remaining: number
+}
+
+/**
+ * Create sign-in accounts for every roster row that has none.
+ *
+ * A CSV import writes roster rows only, so a 119-person import leaves 119
+ * people who cannot sign in with any password — the account does not exist.
+ * Doing that one at a time is not a realistic ask, hence this.
+ *
+ * Everyone starts on DEFAULT_PASSWORD with `password_created: false`, exactly
+ * as "Create login" does for a single person, and gets one self-service change
+ * from My Profile. Roles are NOT granted here: every account is an employee,
+ * and an administrator promotes individuals afterwards from Members & access.
+ *
+ * Partial success is normal and reported rather than thrown — a bad address in
+ * row 40 must not cost the other 118 their accounts.
+ */
+export async function createMissingLogins(): Promise<ActionResult<BulkLoginResult>> {
+  try {
+    await requireRole('hr')
+    const supabase = await createClient()
+
+    const admin = adminClient()
+    if (!admin) return fail(SERVICE_KEY_HELP)
+
+    const { data: roster, error } = await supabase
+      .from('employees')
+      .select('id, full_name, email')
+      .is('user_id', null)
+      .order('employee_id')
+
+    if (error) return fail(error.message)
+    if (!roster || roster.length === 0) {
+      return { ok: true, data: { created: 0, skipped: [], remaining: 0 } }
+    }
+
+    const skipped: { email: string; reason: string }[] = []
+    let created = 0
+
+    for (const row of roster) {
+      const email = String(row.email ?? '').trim().toLowerCase()
+      const name = String(row.full_name ?? '').trim()
+
+      if (!EMAIL_RE.test(email)) {
+        skipped.push({ email: email || '(blank)', reason: 'Invalid email address' })
+        continue
+      }
+
+      const { data: made, error: createError } = await admin.auth.admin.createUser({
+        email,
+        password: DEFAULT_PASSWORD,
+        email_confirm: true,
+        user_metadata: {
+          full_name: name,
+          role: 'employee',
+          account_status: 'active',
+          password_created: false,
+        },
+      })
+
+      if (createError || !made?.user) {
+        skipped.push({
+          email,
+          reason: /already been registered|already exists/i.test(createError?.message ?? '')
+            ? 'An account already exists for that address'
+            : (createError?.message ?? 'Could not create the account'),
+        })
+        continue
+      }
+
+      // Link the roster row, or the person has an account the app cannot find
+      // and this action would try to create it again on the next run.
+      const { error: linkError } = await admin
+        .from('employees')
+        .update({ user_id: made.user.id })
+        .eq('id', row.id)
+
+      if (linkError) {
+        skipped.push({ email, reason: `Account made but not linked: ${linkError.message}` })
+        continue
+      }
+
+      created += 1
+    }
+
+    const { count } = await supabase
+      .from('employees')
+      .select('id', { count: 'exact', head: true })
+      .is('user_id', null)
+
+    refresh()
+    return { ok: true, data: { created, skipped, remaining: count ?? 0 } }
+  } catch (err) {
+    return toResult(err)
+  }
+}
+
 interface ManageTarget {
   id: string
   email: string

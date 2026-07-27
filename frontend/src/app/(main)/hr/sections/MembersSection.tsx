@@ -18,6 +18,7 @@ import { formatDateTime } from '@/lib/format'
 import { DEFAULT_PASSWORD, MIN_PASSWORD_LENGTH } from '@/lib/types'
 import {
   createEmployeeLogin,
+  createMissingLogins,
   deleteMember,
   getMemberImpact,
   inviteMember,
@@ -57,6 +58,42 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
   const [removing, setRemoving] = useState<Member | null>(null)
   const [passwordFor, setPasswordFor] = useState<Member | null>(null)
   const [creatingId, setCreatingId] = useState<string | null>(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  /** Roster rows still waiting for an account. */
+  const pendingCount = (members ?? []).filter((m) => m.hasLogin === false).length
+
+  /**
+   * Give every account-less roster row a login in one pass.
+   *
+   * 100+ accounts is a slow request by nature — each one is a separate call to
+   * the auth admin API — so the button reports what happened rather than
+   * pretending it was instant, and partial success is normal.
+   */
+  async function bulkCreateLogins() {
+    setBulkBusy(true)
+    const res = await createMissingLogins()
+
+    if (res.ok) {
+      const { created, skipped, remaining } = res.data
+      if (created > 0) {
+        toast.success(
+          `Created ${created} login${created === 1 ? '' : 's'}. Everyone signs in with ${DEFAULT_PASSWORD} and changes it from My Profile.`,
+        )
+      }
+      if (skipped.length > 0) {
+        toast.error(
+          `${skipped.length} skipped — first: ${skipped[0].email} (${skipped[0].reason}). ${remaining} still without a login.`,
+        )
+      }
+      const after = await listMembers()
+      if (after.ok) setMembers(after.data)
+      router.refresh()
+    } else {
+      toast.error(res.error)
+    }
+    setBulkBusy(false)
+  }
   const toast = useToast()
   const router = useRouter()
 
@@ -215,13 +252,36 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
     <>
       <PageHeader
         title="Members & access"
-        subtitle="Everyone with a FinAtt account — admins, HR and employees"
+        subtitle="Everyone in the organisation — accounts, and roster rows with no login yet"
         action={
           <button onClick={() => setInviting(true)} className="btn btn-primary btn-sm">
             <Plus size={15} /> Invite member
           </button>
         }
       />
+
+      {pendingCount > 0 && (
+        <Alert tone="warning">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>
+              <strong>
+                {pendingCount} {pendingCount === 1 ? 'person has' : 'people have'} no sign-in
+                account.
+              </strong>{' '}
+              They cannot log in with any password until one exists — importing a CSV creates
+              roster records only.
+            </span>
+            <button
+              onClick={bulkCreateLogins}
+              disabled={bulkBusy}
+              className="btn btn-primary btn-sm shrink-0"
+            >
+              {bulkBusy ? <Spinner size={14} /> : <KeyRound size={14} />}
+              {bulkBusy ? 'Creating…' : `Create ${pendingCount} logins`}
+            </button>
+          </div>
+        </Alert>
+      )}
 
       {members && members.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">

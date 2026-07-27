@@ -639,6 +639,10 @@ function MyProfileSection({
     <>
       <PageHeader title="My profile" subtitle="Your administrator account details" />
       <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Profile picture">
+          <ProfilePicture name={profile.name} initialUrl={profile.avatarUrl ?? null} />
+        </Panel>
+
         <Panel title="Details">
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
