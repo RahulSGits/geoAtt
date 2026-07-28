@@ -1,0 +1,7 @@
+{
+  "//": "Lets `firebase deploy` publish the rules and indexes from this folder. Install once with: npm i -g firebase-tools && firebase login && firebase use attendence-app-f7f9d",
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

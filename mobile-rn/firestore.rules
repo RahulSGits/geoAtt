@@ -1,0 +1,182 @@
+rules_version = '2';
+
+/**
+ * Firestore rules mirroring the website's Row Level Security.
+ *
+ * Deploy with:  firebase deploy --only firestore:rules
+ *
+ * Firestore denies by default, so anything not matched below is refused. Rules
+ * are the ONLY thing standing between this data and the open internet — the
+ * Firebase config in the client is public, so "the app doesn't call that path"
+ * is not a control. Treat every rule here as the real boundary.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── helpers ────────────────────────────────────────────────────────────
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myProfile() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data;
+    }
+
+    function myRole() {
+      return signedIn() ? myProfile().role : '';
+    }
+
+    // Admin is a superset of HR — the same thing `is_hr()` does in Postgres.
+    function isHr() {
+      return myRole() == 'hr' || myRole() == 'admin';
+    }
+
+    function isAdmin() {
+      return myRole() == 'admin';
+    }
+
+    /** The employees row belonging to the caller, if any. */
+    function ownsEmployee(employeeId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/employees/$(employeeId))
+        && get(/databases/$(database)/documents/employees/$(employeeId)).data.user_id == request.auth.uid;
+    }
+
+    function unchanged(field) {
+      return request.resource.data[field] == resource.data[field];
+    }
+
+    // ── profiles ───────────────────────────────────────────────────────────
+    match /profiles/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isHr());
+
+      // Self-registration writes exactly one profile, for yourself, as an
+      // employee. Anything else is an admin action.
+      allow create: if signedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.role == 'employee'
+                    && request.resource.data.id == uid;
+
+      // A user may edit their own profile but NEVER their own role — that is
+      // the privilege-escalation hole Postgres closes with a column trigger.
+      // Only an admin changes roles.
+      allow update: if signedIn() && (
+                      (request.auth.uid == uid
+                        && unchanged('role')
+                        && unchanged('password_reset_allowed'))
+                      || isAdmin()
+                    );
+
+      allow delete: if isAdmin();
+    }
+
+    // ── employees ──────────────────────────────────────────────────────────
+    match /employees/{id} {
+      allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isHr());
+
+      // Employees may update only their own record, and may not move
+      // themselves to another site or shift — that is HR's assignment to make,
+      // and self-service would waive the geofence they were posted to.
+      allow update: if signedIn() && (
+                      (resource.data.user_id == request.auth.uid
+                        && unchanged('site_id')
+                        && unchanged('shift_id')
+                        && unchanged('employee_id')
+                        && unchanged('reward_points')
+                        && unchanged('face_enroll_attempts'))
+                      || isHr()
+                    );
+
+      allow create, delete: if isHr();
+    }
+
+    // ── attendance ─────────────────────────────────────────────────────────
+    match /attendance/{id} {
+      allow read: if signedIn() && (ownsEmployee(resource.data.employee_id) || isHr());
+
+      // An employee may record their own day, but never hand-set the status or
+      // flip manual_override — those exist so HR can correct a record, and are
+      // what the auto-status trigger defers to.
+      allow create: if signedIn()
+                    && ownsEmployee(request.resource.data.employee_id)
+                    && request.resource.data.manual_override == false;
+
+      allow update: if signedIn() && (
+                      (ownsEmployee(resource.data.employee_id)
+                        && unchanged('manual_override')
+                        && unchanged('employee_id')
+                        && unchanged('date'))
+                      || isHr()
+                    );
+
+      allow delete: if isHr();
+    }
+
+    // ── leaves ─────────────────────────────────────────────────────────────
+    match /leaves/{id} {
+      allow read: if signedIn() && (ownsEmployee(resource.data.employee_id) || isHr());
+
+      allow create: if signedIn()
+                    && ownsEmployee(request.resource.data.employee_id)
+                    && request.resource.data.status == 'pending';
+
+      // Applicants may withdraw a request but must not approve their own —
+      // status and the decision fields are HR's alone.
+      allow update: if signedIn() && (
+                      (ownsEmployee(resource.data.employee_id)
+                        && unchanged('status')
+                        && unchanged('decided_by')
+                        && unchanged('decided_at'))
+                      || isHr()
+                    );
+
+      allow delete: if signedIn() && (
+                      (ownsEmployee(resource.data.employee_id) && resource.data.status == 'pending')
+                      || isHr()
+                    );
+    }
+
+    // ── announcements ──────────────────────────────────────────────────────
+    match /announcements/{id} {
+      allow read: if signedIn();
+      allow write: if isHr();
+    }
+
+    // ── notifications ──────────────────────────────────────────────────────
+    match /notifications/{id} {
+      // Scoped to the recipient explicitly, so a rule widened later cannot
+      // quietly put the whole company's feed in one person's bell.
+      allow read: if signedIn() && resource.data.recipient_id == request.auth.uid;
+
+      // Only the recipient marks their own as read, and only that field.
+      allow update: if signedIn()
+                    && resource.data.recipient_id == request.auth.uid
+                    && unchanged('recipient_id')
+                    && unchanged('title')
+                    && unchanged('body');
+
+      allow create: if isHr();
+      allow delete: if signedIn() && resource.data.recipient_id == request.auth.uid;
+    }
+
+    // ── reward_events ──────────────────────────────────────────────────────
+    match /reward_events/{id} {
+      allow read: if signedIn() && (ownsEmployee(resource.data.employee_id) || isHr());
+      // Points are awarded by the system, never claimed by the earner.
+      allow write: if isHr();
+    }
+
+    // ── sites and shifts ───────────────────────────────────────────────────
+    // Every signed-in user reads these — the check-in screen needs the geofence
+    // and the rota. Only HR changes them.
+    match /sites/{id} {
+      allow read: if signedIn();
+      allow write: if isHr();
+    }
+
+    match /shifts/{id} {
+      allow read: if signedIn();
+      allow write: if isHr();
+    }
+  }
+}

@@ -54,6 +54,58 @@ Firebase web config is **not secret** — it ships inside every client binary.
 Firestore security rules and Auth are what protect the data. Never put a
 service-account key in `.env`.
 
+## Database
+
+The same nine collections the website has as Postgres tables — `profiles`,
+`employees`, `attendance`, `leaves`, `announcements`, `notifications`,
+`reward_events`, `shifts`, `sites` — with the same field names and value sets.
+Types are in [`lib/schema.ts`](lib/schema.ts).
+
+Field names stay snake_case to match `frontend/src/lib/types.ts` exactly, so the
+two models can be compared line by line.
+
+Four things Postgres did that Firestore cannot:
+
+| Postgres | Here |
+| --- | --- |
+| `unique (employee_id, date)` on attendance | Encoded in the document ID via `attendanceId()` — a duplicate day overwrites instead of double-counting |
+| Foreign keys with `on delete cascade` | Plain ID strings; deletes must clean up their own children |
+| The `compute_attendance_status` trigger | Must run in app code or a Cloud Function — **nothing computes status for you yet** |
+| Enums | Union types, enforced by security rules |
+
+[`firestore.rules`](firestore.rules) mirrors the website's RLS, including the
+part that matters most: a user may edit their own profile but **never their own
+`role`**. Only an admin changes roles. Rules are the only boundary — the
+Firebase config is public, so "the app doesn't call that path" is not a control.
+
+### Seeding
+
+Order matters, and getting it wrong produces a confusing error:
+
+```bash
+npm run seed
+```
+
+```bash
+npm run deploy:rules
+```
+
+Seed **first**, while Firestore is still in test mode. The rules only let a user
+create their own profile as an `employee` — that is exactly what stops anyone
+signing up and handing themselves admin — so the admin and HR profiles cannot be
+written through them. Running the seed after deploying rules fails with
+`permission-denied`, which is correct behaviour, not a bug. Promote accounts from
+the Firebase console instead.
+
+The seed creates three accounts, one site, one shift, and a single `employees`
+row for the employee demo. **No roster is seeded.** Admin and HR deliberately get
+no `employees` row — same as the website, where that absence is what makes
+employee-only actions correctly reject an admin.
+
+Passwords come from `DEMO_PASSWORD` in `.env`, never from a default: this repo is
+public, and a committed fallback would be a working credential for anyone reading
+it.
+
 ## Run
 
 ```bash

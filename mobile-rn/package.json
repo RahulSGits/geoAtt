@@ -34,6 +34,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "icons": "node tools/generate-assets.mjs",
+    "seed": "node --env-file=.env tools/seed.mjs",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
     "build:preview": "eas build --profile preview --platform all",
     "build:android": "eas build --profile production --platform android",
     "build:ios": "eas build --profile production --platform ios",
