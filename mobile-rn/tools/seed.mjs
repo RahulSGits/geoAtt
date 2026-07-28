@@ -75,9 +75,9 @@ const db = getFirestore(app)
 const nowIso = () => new Date().toISOString()
 
 const DEMOS = [
-  { key: 'admin', email: 'admin@finatt.app', name: 'Demo Admin', role: 'admin' },
-  { key: 'hr', email: 'hr@finatt.app', name: 'Demo HR', role: 'hr' },
-  { key: 'employee', email: 'employee@finatt.app', name: 'Demo Employee', role: 'employee' },
+  { key: 'admin', email: 'admin@geoatt.app', name: 'Demo Admin', role: 'admin' },
+  { key: 'hr', email: 'hr@geoatt.app', name: 'Demo HR', role: 'hr' },
+  { key: 'employee', email: 'employee@geoatt.app', name: 'Demo Employee', role: 'employee' },
 ]
 
 const SITE_ID = 'site-hq'

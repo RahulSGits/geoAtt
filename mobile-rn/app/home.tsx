@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import FinAttLogo from '../components/FinAttLogo'
+import GeoAttLogo from '../components/GeoAttLogo'
 import Screen from '../components/Screen'
 import { useAuth } from '../lib/auth'
 import { colors, radius } from '../lib/theme'
@@ -31,7 +31,7 @@ export default function HomeRoute() {
     <Screen>
       <View style={[styles.body, { paddingTop: insets.top + 26, paddingBottom: insets.bottom + 26 }]}>
         <Animated.View entering={FadeInUp.duration(520)} style={styles.header}>
-          <FinAttLogo size={54} static />
+          <GeoAttLogo size={54} static />
           <View style={{ marginLeft: 13 }}>
             <Text style={styles.hello}>Hi, {greeting}</Text>
             <Text style={styles.email}>{user?.email ?? ''}</Text>

@@ -1,5 +1,5 @@
 /**
- * The FinAtt data model, on Firestore.
+ * The geoAtt data model, on Firestore.
  *
  * These are the same nine tables the website has in Postgres — profiles,
  * employees, attendance, leaves, announcements, notifications, reward_events,

@@ -38,7 +38,7 @@ type Props = {
 }
 
 /**
- * The FinAtt mark: a gradient plate, a ring that draws itself, and a check that
+ * The geoAtt mark: a gradient plate, a ring that draws itself, and a check that
  * strokes in behind it.
  *
  * The ring and the check are revealed with `strokeDashoffset` rather than
@@ -46,7 +46,7 @@ type Props = {
  * and both run as animated SVG props on the UI thread, so the sequence holds
  * 60fps even while Metro is still resolving the rest of the bundle.
  */
-export default function FinAttLogo({ size = 132, static: isStatic = false }: Props) {
+export default function GeoAttLogo({ size = 132, static: isStatic = false }: Props) {
   const plateScale = useSharedValue(isStatic ? 1 : 0.62)
   const plateOpacity = useSharedValue(isStatic ? 1 : 0)
   const ringProgress = useSharedValue(isStatic ? 1 : 0)

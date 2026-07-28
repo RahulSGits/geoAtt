@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router'
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import FinAttLogo from '../components/FinAttLogo'
+import GeoAttLogo from '../components/GeoAttLogo'
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from '../components/Icons'
 import Screen from '../components/Screen'
 import { authErrorMessage, useAuth } from '../lib/auth'
@@ -103,8 +103,8 @@ export default function LoginRoute() {
           showsVerticalScrollIndicator={false}
         >
           <Animated.View entering={FadeInDown.duration(520)} style={styles.header}>
-            <FinAttLogo size={62} static />
-            <Text style={styles.brand}>FinAtt</Text>
+            <GeoAttLogo size={62} static />
+            <Text style={styles.brand}>geoAtt</Text>
             <Text style={styles.brandTag}>Attendance & Workforce</Text>
           </Animated.View>
 
@@ -112,7 +112,7 @@ export default function LoginRoute() {
             <Text style={styles.title}>{isRegister ? 'Create account' : 'Welcome back'}</Text>
             <Text style={styles.subtitle}>
               {isRegister
-                ? 'Set up your FinAtt account to start marking attendance.'
+                ? 'Set up your geoAtt account to start marking attendance.'
                 : 'Sign in to mark attendance and view your records.'}
             </Text>
 
@@ -205,7 +205,7 @@ export default function LoginRoute() {
 
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>
-                {isRegister ? 'Already have an account?' : 'New to FinAtt?'}
+                {isRegister ? 'Already have an account?' : 'New to geoAtt?'}
               </Text>
               <Pressable
                 onPress={() => {

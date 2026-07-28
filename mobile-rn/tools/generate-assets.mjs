@@ -4,7 +4,7 @@
  *
  *   npm run icons
  *
- * The geometry below is the SAME geometry as components/FinAttLogo.tsx, in the
+ * The geometry below is the SAME geometry as components/GeoAttLogo.tsx, in the
  * same 0..1 unit space. That is the whole point: the native splash shows this
  * PNG, then app/index.tsx fades in the SVG version on top. If the two drift the
  * handoff visibly jumps, so edit both together.
@@ -26,7 +26,7 @@ const PLATE_TO = [0x1d, 0x4e, 0xd8] // brandDark
 const BACKDROP = [0x0a, 0x12, 0x30] // backdrop[0]
 const WHITE = [0xff, 0xff, 0xff]
 
-// ── geometry — mirrors components/FinAttLogo.tsx ───────────────────────────
+// ── geometry — mirrors components/GeoAttLogo.tsx ───────────────────────────
 const RING_R = 0.44
 const RING_HALF_W = 0.015
 const MARK_POINTS = [
@@ -198,7 +198,7 @@ function write(rel, buf) {
   console.log(`  ${rel.padEnd(42)} ${(buf.length / 1024).toFixed(1)} kB`)
 }
 
-console.log('FinAtt brand assets')
+console.log('geoAtt brand assets')
 // Store icons must be opaque squares — App Store Connect rejects alpha.
 write('assets/icon.png', render(1024, 'square'))
 // The native splash mark: transparent around the plate so it sits on backdrop.
@@ -207,4 +207,4 @@ write('assets/android-icon-foreground.png', render(1024, 'foreground'))
 write('assets/android-icon-monochrome.png', render(1024, 'mono'))
 write('assets/favicon.png', renderFavicon(64))
 
-console.log('\nGeometry mirrors components/FinAttLogo.tsx — edit both together.')
+console.log('\nGeometry mirrors components/GeoAttLogo.tsx — edit both together.')

@@ -1,11 +1,11 @@
-# FinAtt — React Native
+# geoAtt — React Native
 
 A standalone app for **iOS, Android and the web**, from one React Native
 codebase. Expo compiles the same tree to native on both stores and to a static
 site through React Native Web — the three targets never diverge because there
 is only ever one implementation.
 
-**This app does not touch the FinAtt web backend.** It has no connection to the
+**This app does not touch the geoAtt web backend.** It has no connection to the
 Supabase project in `../supabase`, reads none of its tables, and shares no
 accounts with it. Auth and data are its own, on Firebase.
 
@@ -123,7 +123,7 @@ practical way to iterate on layout and animation.
 
 ## The splash
 
-`app/index.tsx` plus `components/FinAttLogo.tsx`. The timeline lives in
+`app/index.tsx` plus `components/GeoAttLogo.tsx`. The timeline lives in
 `splashTiming` in `lib/theme.ts` — one object, read top to bottom:
 
 | ms | Beat |
@@ -131,7 +131,7 @@ practical way to iterate on layout and animation.
 | 0 | Plate springs up from 0.62 with a soft overshoot |
 | 240 | Ring draws itself clockwise from 12 o'clock |
 | 560 | Check strokes in |
-| 900 | "FinAtt" fades and rises 18px |
+| 900 | "geoAtt" fades and rises 18px |
 | 1120 | Tagline fades in; loading dots begin |
 | 1560 | Glow starts a slow two-beat breath |
 | 2500 | Whole stack lifts 26px and fades, then routes on |
@@ -161,7 +161,7 @@ writes them with Node's built-in zlib. No dependencies — the usual choice,
 
 It emits the store icon (opaque — App Store Connect rejects alpha), the splash
 mark, the Android adaptive foreground and monochrome layers, and the favicon,
-each at its own inset. **Its geometry mirrors `components/FinAttLogo.tsx`** — if
+each at its own inset. **Its geometry mirrors `components/GeoAttLogo.tsx`** — if
 you change one, change both, or the splash handoff visibly jumps.
 
 ## Publishing — web
@@ -214,7 +214,7 @@ advance on their own.
 ### Store checklist
 
 - [ ] `apiKey` and `appId` filled in `.env`, Email/Password enabled
-- [ ] Bundle ID `com.finatt.mobile` registered on both consoles
+- [ ] Bundle ID `com.geoatt.mobile` registered on both consoles
 - [ ] Privacy policy URL — **both** stores reject without one
 - [ ] Apple: if you later add Google sign-in, Sign in with Apple becomes
       mandatory alongside it
@@ -253,4 +253,4 @@ history, leave, admin. Nothing here presumes how those work.
 | UI changes reach users | Rebuild + store review | Deploy the website — instant |
 
 Ship this one for a fresh, independent product. Ship `../mobile` to put the
-existing FinAtt platform in employees' hands now.
+existing geoAtt platform in employees' hands now.

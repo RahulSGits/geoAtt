@@ -1,7 +1,7 @@
 /**
  * One source of truth for colour and type.
  *
- * The blues are lifted from the launcher icon that already ships with FinAtt
+ * The blues are lifted from the launcher icon that already ships with geoAtt
  * (#3B82F6 → #1D4ED8), so the splash reads as the same product as the icon the
  * user just tapped rather than an unrelated screen.
  */

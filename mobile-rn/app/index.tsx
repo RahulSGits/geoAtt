@@ -14,7 +14,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
-import FinAttLogo from '../components/FinAttLogo'
+import GeoAttLogo from '../components/GeoAttLogo'
 import { useAuth } from '../lib/auth'
 import { colors, splashTiming } from '../lib/theme'
 
@@ -134,10 +134,10 @@ export default function SplashRoute() {
         always-opaque background would sit behind and spoil.
       */}
       <Animated.View style={[styles.stack, stackStyle]}>
-        <FinAttLogo size={136} />
+        <GeoAttLogo size={136} />
 
         <Animated.View style={wordmarkStyle}>
-          <Text style={styles.wordmark}>FinAtt</Text>
+          <Text style={styles.wordmark}>geoAtt</Text>
         </Animated.View>
 
         <Animated.View style={taglineStyle}>
