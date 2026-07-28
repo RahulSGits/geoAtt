@@ -1,0 +1,169 @@
+# FinAtt Mobile — React Native
+
+A standalone iOS + Android app. One codebase, both stores.
+
+**This app does not touch the FinAtt web backend.** It has no connection to the
+Supabase project in `../supabase`, reads none of its tables, and shares no
+accounts with it. Auth and data are its own, on Firebase.
+
+> Also in this repo: `../mobile`, a Capacitor shell that wraps the existing
+> Next.js site and *does* use the Supabase backend. The two are independent —
+> pick one to publish. See [Which one should I ship?](#which-one-should-i-ship).
+
+## Stack
+
+| Layer | Choice |
+| --- | --- |
+| Runtime | Expo SDK 57 / React Native 0.86 / React 19 |
+| Routing | expo-router (file-based, typed routes) |
+| Auth + data | Firebase — Auth (email/password) and Firestore, free Spark plan |
+| Animation | react-native-reanimated 4 (UI-thread) |
+| Vector | react-native-svg |
+| Builds | EAS Build → `.aab` for Play, `.ipa` for App Store |
+
+No `babel.config.js`: `babel-preset-expo` wires the Reanimated plugin in SDK 57,
+and adding one applies it twice.
+
+## Setup
+
+```bash
+npm install
+cp .env.example .env      # then fill it in — see below
+npm start
+```
+
+### Firebase
+
+Project **attendence-app** (`attendence-app-f7f9d`) is already referenced in
+`.env`. Two values are still blank, both produced by registering a Web app:
+
+1. [Project settings → General](https://console.firebase.google.com/project/attendence-app-f7f9d/settings/general)
+   → **Your apps** → **Add app** → **Web** (`</>`)
+2. Copy `apiKey` and `appId` from the `firebaseConfig` snippet into `.env`
+3. [Authentication → Sign-in method](https://console.firebase.google.com/project/attendence-app-f7f9d/authentication/providers)
+   → enable **Email/Password**
+
+Skip step 3 and every sign-in fails with `auth/operation-not-allowed`.
+
+Until `.env` is complete the app still runs — the sign-in card shows a notice
+and disables the button rather than crashing. That is deliberate: `getAuth()`
+throws `auth/invalid-api-key` synchronously at module scope, which would take
+down the whole render tree and show a white screen instead of an explanation.
+
+Firebase web config is **not secret** — it ships inside every client binary.
+Firestore security rules and Auth are what protect the data. Never put a
+service-account key in `.env`.
+
+## Run
+
+```bash
+npm run web        # fastest loop — the splash and auth screens in a browser
+npm run ios        # needs Xcode
+npm run android    # needs Android Studio + JDK 21
+```
+
+`npm run web` needs neither Xcode nor Android Studio, which makes it the
+practical way to iterate on layout and animation.
+
+## The splash
+
+`app/index.tsx` plus `components/FinAttLogo.tsx`. The timeline lives in
+`splashTiming` in `lib/theme.ts` — one object, read top to bottom:
+
+| ms | Beat |
+| --- | --- |
+| 0 | Plate springs up from 0.62 with a soft overshoot |
+| 240 | Ring draws itself clockwise from 12 o'clock |
+| 560 | Check strokes in |
+| 900 | "FinAtt" fades and rises 18px |
+| 1120 | Tagline fades in; loading dots begin |
+| 1560 | Glow starts a slow two-beat breath |
+| 2500 | Whole stack lifts 26px and fades, then routes on |
+
+The ring and check are revealed with `strokeDashoffset`, not opacity — that is
+what makes them read as *drawn* rather than faded in. Both run as animated SVG
+props on the UI thread, so the sequence holds 60fps while Metro is still
+resolving the rest of the bundle.
+
+Navigation fires from the fade's own completion callback rather than a
+`setTimeout`, so a slow device can never route mid-stroke.
+
+The native splash (`app.json` → `expo-splash-screen`) uses the same backdrop and
+the same mark at the same 136px width, so the handoff from OS splash to animated
+splash is invisible. `assets/splash-icon.png` is generated from the same
+geometry as the SVG — see below.
+
+## Brand assets
+
+```bash
+npm run icons
+```
+
+`tools/generate-assets.mjs` draws every PNG from signed distance fields and
+writes them with Node's built-in zlib. No dependencies — the usual choice,
+`sharp`, needs a libvips binary that does not install everywhere.
+
+It emits the store icon (opaque — App Store Connect rejects alpha), the splash
+mark, the Android adaptive foreground and monochrome layers, and the favicon,
+each at its own inset. **Its geometry mirrors `components/FinAttLogo.tsx`** — if
+you change one, change both, or the splash handoff visibly jumps.
+
+## Publishing
+
+```bash
+npm i -g eas-cli && eas login && eas init
+```
+
+```bash
+npm run build:preview      # installable test builds, both platforms
+```
+
+```bash
+npm run build:android      # .aab for Play Console
+```
+
+```bash
+npm run build:ios          # .ipa for App Store Connect
+```
+
+EAS builds on hosted macOS/Linux, so **an iOS build does not need a Mac** — it
+does need a paid Apple Developer account ($99/yr). Play Console is a one-time
+$25.
+
+Before a store build, bump `version` in `app.json`. `eas.json` sets
+`autoIncrement` on the production profile, so `buildNumber` / `versionCode`
+advance on their own.
+
+`eas submit` uploads. For Android it wants a Play service-account JSON at
+`./play-service-account.json` — gitignored, and it must stay that way.
+
+### Store checklist
+
+- [ ] `apiKey` and `appId` filled in `.env`, Email/Password enabled
+- [ ] Bundle ID `com.finatt.mobile` registered on both consoles
+- [ ] Privacy policy URL — **both** stores reject without one
+- [ ] Apple: if you later add Google sign-in, Sign in with Apple becomes
+      mandatory alongside it
+- [ ] Data safety form (Play) and privacy nutrition labels (App Store) —
+      declare email collection
+
+## What's built
+
+Splash → sign in / register → home, with sessions that survive a cold start
+(AsyncStorage persistence; `getAuth()` alone is in-memory on native and would
+sign the user out every launch).
+
+`app/home.tsx` is the seam where attendance features go. Not built yet: check-in,
+history, leave, admin. Nothing here presumes how those work.
+
+## Which one should I ship?
+
+| | `mobile-rn` (this) | `mobile` (Capacitor) |
+| --- | --- | --- |
+| Backend | Firebase, standalone | Existing Supabase |
+| Existing accounts and face enrollments | Not used | Fully preserved |
+| Attendance features | To be built | Already complete |
+| UI changes reach users | Rebuild + store review | Deploy the website — instant |
+
+Ship this one for a fresh, independent product. Ship `../mobile` to put the
+existing FinAtt platform in employees' hands now.

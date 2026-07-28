@@ -1,0 +1,39 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
+    },
+    "preview": {
+      "//": "Shareable test builds. Android emits a plain APK that installs by download; iOS needs the tester's device UDID registered on your Apple Developer account.",
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": false }
+    },
+    "production": {
+      "//": "Store binaries: Android App Bundle for Play, IPA for App Store Connect.",
+      "autoIncrement": true,
+      "android": { "buildType": "app-bundle" }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "//": "Path to a Google Play service-account JSON. Keep it OUT of git.",
+        "serviceAccountKeyPath": "./play-service-account.json",
+        "track": "internal"
+      },
+      "ios": {
+        "//": "Fill these in from App Store Connect, or omit and EAS will prompt.",
+        "appleId": "",
+        "ascAppId": "",
+        "appleTeamId": ""
+      }
+    }
+  }
+}

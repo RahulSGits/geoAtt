@@ -23,6 +23,17 @@
       ],
       "autoPort": true,
       "port": 3000
+    },
+    {
+      "name": "finatt-rn-web",
+      "//": "The Expo app on its React Native Web target. Lets the splash animation and auth screens be checked in a browser without Xcode or an Android emulator.",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd '/Users/rahul/Downloads/FinAtt app/mobile-rn' && exec npx expo start --web --port $PORT"
+      ],
+      "autoPort": true,
+      "port": 8081
     }
   ]
 }
