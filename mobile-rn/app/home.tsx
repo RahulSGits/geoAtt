@@ -1,11 +1,11 @@
 import { useEffect } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import FinAttLogo from '../components/FinAttLogo'
+import Screen from '../components/Screen'
 import { useAuth } from '../lib/auth'
 import { colors, radius } from '../lib/theme'
 
@@ -28,15 +28,7 @@ export default function HomeRoute() {
   const greeting = user?.displayName?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'there'
 
   return (
-    <View style={styles.root}>
-      <LinearGradient
-        colors={colors.backdrop}
-        locations={[0, 0.55, 1]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-
+    <Screen>
       <View style={[styles.body, { paddingTop: insets.top + 26, paddingBottom: insets.bottom + 26 }]}>
         <Animated.View entering={FadeInUp.duration(520)} style={styles.header}>
           <FinAttLogo size={54} static />
@@ -67,12 +59,11 @@ export default function HomeRoute() {
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
       </View>
-    </View>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.backdrop[0] },
   body: { flex: 1, paddingHorizontal: 22 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 26 },
   hello: { color: colors.onBrand, fontSize: 21, fontWeight: '700', letterSpacing: -0.3 },
@@ -82,11 +73,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     padding: 22,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 9,
+    // See login.tsx — boxShadow replaces the deprecated shadow*/elevation pair.
+    boxShadow: '0px 12px 24px rgba(0,0,0,0.20)',
   },
   cardTitle: { color: colors.ink, fontSize: 18, fontWeight: '700' },
   cardBody: { marginTop: 8, color: colors.inkMuted, fontSize: 13.5, lineHeight: 20 },

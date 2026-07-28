@@ -106,7 +106,6 @@ export default function FinAttLogo({ size = 132, static: isStatic = false }: Pro
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Animated.View
-        pointerEvents="none"
         style={[
           StyleSheet.absoluteFill,
           {
@@ -114,10 +113,12 @@ export default function FinAttLogo({ size = 132, static: isStatic = false }: Pro
             backgroundColor: colors.brandLight,
             // A cheap bloom: a blurred shadow reads better than an SVG filter,
             // which react-native-svg does not support consistently on Android.
-            shadowColor: colors.brandLight,
-            shadowOpacity: 1,
-            shadowRadius: size * 0.42,
-            shadowOffset: { width: 0, height: 0 },
+            //
+            // `boxShadow` rather than the shadow* props, and `pointerEvents` in
+            // style rather than as a prop — both of the old forms are deprecated
+            // in React Native 0.86 and warn on every render.
+            boxShadow: `0px 0px ${size * 0.42}px ${colors.brandLight}`,
+            pointerEvents: 'none',
           },
           glowStyle,
         ]}

@@ -10,13 +10,13 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import FinAttLogo from '../components/FinAttLogo'
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from '../components/Icons'
+import Screen from '../components/Screen'
 import { authErrorMessage, useAuth } from '../lib/auth'
 import { isFirebaseConfigured } from '../lib/firebase'
 import { colors, radius } from '../lib/theme'
@@ -89,15 +89,7 @@ export default function LoginRoute() {
   const isRegister = mode === 'register'
 
   return (
-    <View style={styles.root}>
-      <LinearGradient
-        colors={colors.backdrop}
-        locations={[0, 0.55, 1]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-
+    <Screen>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -231,7 +223,7 @@ export default function LoginRoute() {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </Screen>
   )
 }
 
@@ -259,7 +251,6 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.backdrop[0] },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 22 },
 
   header: { alignItems: 'center', marginBottom: 26 },
@@ -276,12 +267,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     padding: 24,
-    // Lifts the card off the gradient without a hard edge.
-    shadowColor: '#000',
-    shadowOpacity: 0.22,
-    shadowRadius: 26,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 10,
+    // Lifts the card off the gradient without a hard edge. `boxShadow` covers
+    // iOS, Android and web in one prop as of RN 0.76 — the shadow*/elevation
+    // pair it replaces is deprecated and warns on every render in 0.86.
+    boxShadow: '0px 14px 26px rgba(0,0,0,0.22)',
   },
   title: { color: colors.ink, fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
   subtitle: { marginTop: 6, marginBottom: 20, color: colors.inkMuted, fontSize: 13.5, lineHeight: 19 },

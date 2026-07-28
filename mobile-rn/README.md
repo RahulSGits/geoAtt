@@ -1,6 +1,9 @@
-# FinAtt Mobile — React Native
+# FinAtt — React Native
 
-A standalone iOS + Android app. One codebase, both stores.
+A standalone app for **iOS, Android and the web**, from one React Native
+codebase. Expo compiles the same tree to native on both stores and to a static
+site through React Native Web — the three targets never diverge because there
+is only ever one implementation.
 
 **This app does not touch the FinAtt web backend.** It has no connection to the
 Supabase project in `../supabase`, reads none of its tables, and shares no
@@ -19,6 +22,7 @@ accounts with it. Auth and data are its own, on Firebase.
 | Auth + data | Firebase — Auth (email/password) and Firestore, free Spark plan |
 | Animation | react-native-reanimated 4 (UI-thread) |
 | Vector | react-native-svg |
+| Web | React Native Web, exported static and served from Firebase Hosting |
 | Builds | EAS Build → `.aab` for Play, `.ipa` for App Store |
 
 No `babel.config.js`: `babel-preset-expo` wires the Reanimated plugin in SDK 57,
@@ -160,7 +164,25 @@ mark, the Android adaptive foreground and monochrome layers, and the favicon,
 each at its own inset. **Its geometry mirrors `components/FinAttLogo.tsx`** — if
 you change one, change both, or the splash handoff visibly jumps.
 
-## Publishing
+## Publishing — web
+
+```bash
+npm run build:web      # static export into dist/
+npm run serve:web      # check it locally first, on :8090
+npm run deploy:web     # build + push to Firebase Hosting
+```
+
+`npm run serve:web` exists because a plain static server is not a fair test.
+`web.output` is `"single"`, so `/login` has no file on disk — an ordinary server
+404s it and you would only find out after deploying. That script reproduces the
+SPA rewrite from `firebase.json`, so deep links and refreshes are exercised the
+way hosting will actually serve them.
+
+Hosting headers are set so `/_expo/**` (hashed filenames) is cached forever
+while `index.html` never is — otherwise a deploy ships new assets to browsers
+still holding the old shell.
+
+## Publishing — iOS and Android
 
 ```bash
 npm i -g eas-cli && eas login && eas init
@@ -198,6 +220,19 @@ advance on their own.
       mandatory alongside it
 - [ ] Data safety form (Play) and privacy nutrition labels (App Store) —
       declare email collection
+
+## Layout across three targets
+
+React Native lays out to the viewport, which is fine on a phone and wrong in a
+desktop browser — every screen stretched edge to edge, giving a 1900px-wide
+password field. [`components/Screen.tsx`](components/Screen.tsx) caps the
+content column at 440px and centres it, leaving the gradient full-bleed behind.
+One component, no media queries, and the same tree reads correctly at 375px and
+at 2560px.
+
+The splash keeps its own gradient rather than using `Screen`: it fades the
+backdrop out as one unit with the mark, which an always-opaque shared background
+would sit behind and spoil.
 
 ## What's built
 

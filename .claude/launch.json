@@ -34,6 +34,17 @@
       ],
       "autoPort": true,
       "port": 8081
+    },
+    {
+      "name": "finatt-rn-dist",
+      "//": "Serves the PRODUCTION web export from mobile-rn/dist, so `npm run build:web` output can be checked before it goes to Firebase Hosting. Dev-server success does not prove the production bundle boots.",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd / && exec node '/Users/rahul/Downloads/FinAtt app/mobile-rn/tools/serve-dist.mjs' $PORT"
+      ],
+      "autoPort": true,
+      "port": 8090
     }
   ]
 }

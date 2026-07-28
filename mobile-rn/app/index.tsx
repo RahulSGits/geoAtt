@@ -128,6 +128,11 @@ export default function SplashRoute() {
         style={StyleSheet.absoluteFill}
       />
 
+      {/*
+        The splash keeps its own gradient rather than using <Screen>: it fades
+        the backdrop out as one unit with the mark on exit, which a shared
+        always-opaque background would sit behind and spoil.
+      */}
       <Animated.View style={[styles.stack, stackStyle]}>
         <FinAttLogo size={136} />
 
