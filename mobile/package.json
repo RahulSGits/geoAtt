@@ -1,0 +1,30 @@
+{
+  "name": "finatt-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native iOS and Android shells for the FinAtt web app. Renders the deployed Next.js app in a native WebView — same code, same Supabase database, same backend.",
+  "scripts": {
+    "sync": "cap sync",
+    "open:ios": "cap open ios",
+    "open:android": "cap open android",
+    "run:ios": "cap run ios",
+    "run:android": "cap run android",
+    "build:android": "cd android && ./gradlew assembleDebug",
+    "bundle:android": "cd android && ./gradlew bundleRelease",
+    "doctor": "cap doctor"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/geolocation": "^8.2.0",
+    "@capacitor/ios": "^8.4.2",
+    "@capacitor/keyboard": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.2",
+    "typescript": "^5"
+  }
+}

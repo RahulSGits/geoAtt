@@ -12,6 +12,17 @@
       ],
       "autoPort": true,
       "port": 3000
+    },
+    {
+      "name": "finatt-app-web",
+      "//": "This checkout. The `finatt-web` entry above points at the sibling ~/Downloads/FinAtt, which is what currently holds port 3000.",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd '/Users/rahul/Downloads/FinAtt app/frontend' && exec npm run dev"
+      ],
+      "autoPort": true,
+      "port": 3000
     }
   ]
 }
