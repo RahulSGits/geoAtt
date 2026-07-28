@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { getSession } from '@/lib/auth'
 import { localDateKey } from '@/lib/format'
 import EmployeeDashboardClient from './EmployeeDashboardClient'
+import { myAvatarUrl } from '../avatar-actions'
 import type { Announcement, Attendance, Employee, Leave, Shift, Site } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -61,6 +62,7 @@ export default async function EmployeePage() {
       userProfile={{ id: session.userId, name: session.name, role: 'employee' }}
       email={session.email}
       firstLogin={session.profile?.password_created === false}
+      avatarUrl={await myAvatarUrl()}
       employee={employee ?? null}
       site={siteRes.data ?? null}
       shift={shiftRes.data ?? null}

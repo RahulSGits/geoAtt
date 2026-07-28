@@ -68,6 +68,7 @@ import type { Announcement, Attendance, Employee, Leave, Shift, Site } from '@/l
 import { applyLeave, cancelLeave, checkIn, checkOut, enrollFace, requestRecheckin, updateMyProfile } from './actions'
 import LiveClock from '@/components/LiveClock'
 import ChangePassword from '@/components/ChangePassword'
+import ProfilePicture from '@/components/ProfilePicture'
 import { useRealtimeNotifications } from '@/lib/useRealtimeNotifications'
 
 const LEAVE_TYPES = ['Casual', 'Sick', 'Earned', 'Unpaid', 'Work from home']
@@ -76,6 +77,7 @@ export default function EmployeeDashboardClient({
   userProfile,
   email,
   firstLogin,
+  avatarUrl,
   employee,
   site,
   shift,
@@ -87,6 +89,8 @@ export default function EmployeeDashboardClient({
   userProfile: UserProfile
   email: string
   firstLogin: boolean
+  /** Signed URL for their profile picture, resolved on the server. */
+  avatarUrl: string | null
   employee: Employee | null
   site: Site | null
   shift: Shift | null
@@ -1110,6 +1114,10 @@ function ProfileSection({
                 </Alert>
               </div>
             )}
+          </Panel>
+
+          <Panel title="Profile picture">
+            <ProfilePicture name={userProfile.name} initialUrl={avatarUrl} />
           </Panel>
 
           <ChangePassword firstLogin={firstLogin} />
