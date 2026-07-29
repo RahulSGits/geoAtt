@@ -34,3 +34,6 @@ supabase/.temp
 **/.env
 **/.env.*
 !**/.env.example
+
+# New Supabase project credentials
+db/.env
