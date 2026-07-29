@@ -16,11 +16,7 @@ import {
   usingSandboxSender,
 } from '@/lib/email'
 import { MIN_PASSWORD_LENGTH } from '@/lib/types'
-import {
-  ONBOARDING_PASSWORD_HELP,
-  describeOnboardingPassword,
-  onboardingPassword,
-} from '@/lib/onboarding'
+import { ONBOARDING_PASSWORD_HELP, onboardingPassword } from '@/lib/onboarding'
 import type { ActionResult } from '@/lib/types'
 
 function fail(error: string): ActionResult<never> {
@@ -601,6 +597,15 @@ export async function getEmailCapability(): Promise<{
   email: boolean
   serviceKey: boolean
 }> {
+  // Guarded like every other action here. A Server Action is a POST endpoint
+  // that anyone who learns its ID can call, so without this it reported the
+  // deployment's configuration to unauthenticated callers. Failing closed keeps
+  // the shape the callers expect rather than forcing them to handle an error.
+  try {
+    await requireRole('hr')
+  } catch {
+    return { email: false, serviceKey: false }
+  }
   return { email: emailConfigured(), serviceKey: adminClient() !== null }
 }
 

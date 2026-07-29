@@ -7,6 +7,7 @@ import { localDateKey } from '@/lib/format'
 import { usingSandboxSender } from '@/lib/email'
 import HrDashboardClient from './HrDashboardClient'
 import { describeServiceKey, serviceKeyState, serviceKeyUsable } from '@/lib/serviceKey'
+import { describeOnboardingPassword, onboardingPassword } from '@/lib/onboarding'
 import { myAvatarUrl } from '../avatar-actions'
 import type {
   Announcement,
@@ -167,6 +168,8 @@ export default async function HrPage() {
         serviceKey: serviceKeyUsable(),
         serviceKeyDetail: describeServiceKey(serviceKeyState()),
         email: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM),
+        onboardingPassword: onboardingPassword() !== null,
+        onboardingPasswordDetail: describeOnboardingPassword() ?? undefined,
         sandboxSender: usingSandboxSender(),
         siteUrl: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
         aiModel: process.env.GEMINI_MODEL || 'gemini-flash-latest (auto)',

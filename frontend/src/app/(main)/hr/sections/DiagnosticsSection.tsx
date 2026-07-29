@@ -15,6 +15,10 @@ export interface DiagnosticsData {
   /** Names the actual fault: missing, expired, or from another project. */
   serviceKeyDetail?: string
   email: boolean
+  /** Whether ONBOARDING_PASSWORD is set and long enough. */
+  onboardingPassword: boolean
+  /** Names the fault when it is not: unset, or too short. */
+  onboardingPasswordDetail?: string
   siteUrl: string
   sandboxSender: boolean
   aiModel: string
@@ -199,6 +203,17 @@ export default function DiagnosticsSection({
                 diagnostics.email
                   ? 'Invite and leave-decision emails will send.'
                   : 'Set RESEND_API_KEY and EMAIL_FROM to enable invite emails. Everything else works without them.'
+              }
+            />
+            <Row
+              icon={<KeyRound size={15} />}
+              label="Onboarding password"
+              ok={diagnostics.onboardingPassword}
+              okText="Configured"
+              badText="Not set"
+              detail={
+                diagnostics.onboardingPasswordDetail ??
+                'New HR and employee accounts start on this. Rotate it by changing ONBOARDING_PASSWORD and restarting.'
               }
             />
             <Row
