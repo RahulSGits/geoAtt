@@ -72,7 +72,7 @@ revoke all on function public.set_password_reset_permission(uuid, boolean) from 
 grant execute on function public.set_password_reset_permission(uuid, boolean) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 4. Default password for every employee account: finbud@123
+-- 4. Default password for every employee account
 --
 -- Their profile keeps password_created = false, so the first sign-in sends them
 -- to /set-password to choose their own.
@@ -80,7 +80,13 @@ grant execute on function public.set_password_reset_permission(uuid, boolean) to
 create extension if not exists pgcrypto;
 
 update auth.users u
-   set encrypted_password = crypt('finbud@123', gen_salt('bf', 10)),
+   set encrypted_password = crypt(
+         -- Was a literal here, which published the company's starting
+         -- credential in a public repository. Supply it at run time instead:
+         --   psql -v onboarding_password="'<value>'" -f <this file>
+         coalesce(nullif(current_setting('app.onboarding_password', true), ''),
+                  'CHANGE-ME-BEFORE-RUNNING'),
+         gen_salt('bf', 10)),
        email_confirmed_at = coalesce(u.email_confirmed_at, now()),
        updated_at = now()
   from public.profiles p

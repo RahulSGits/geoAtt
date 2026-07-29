@@ -338,12 +338,17 @@ export type ActionResult<T = undefined> =
   | { ok: false; error: string }
 
 /**
- * The password every HR and employee account starts on.
+ * The onboarding password used to live here as a hardcoded literal.
  *
- * Lives here rather than in the server-actions file: a "use server" module may
- * only export async functions, so a plain constant there fails the build.
+ * It was removed because this module is imported by `'use client'` components,
+ * so the value shipped inside the browser bundle — and, once the repository
+ * became public, sat in a file anyone could read on GitHub. It was the starting
+ * credential for every account in the company.
+ *
+ * It now comes from ONBOARDING_PASSWORD in the environment. See
+ * `lib/onboarding.ts`, which is server-only; client code that needs to display
+ * it calls the HR-guarded `getOnboardingPassword` action.
  */
-export const DEFAULT_PASSWORD = 'finbud@123'
 
 /**
  * Shortest password the app will accept, wherever one is chosen — by the member

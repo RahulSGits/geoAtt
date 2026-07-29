@@ -132,11 +132,17 @@ command line, a file, or the process list. See [Scripts](#scripts).
 ### Everyone else
 
 Administrators invite people from **Members & access → Invite member**. New HR and employee
-accounts start on a shared default password:
+accounts start on a shared password read from the environment:
 
-```text
-finbud@123
+```bash
+ONBOARDING_PASSWORD=<at least 8 characters>   # frontend/.env.local
 ```
+
+It is deliberately **not** in source. It used to be a constant in
+`frontend/src/lib/types.ts`, which is imported by client components — so it
+shipped in the browser bundle, and once this repository became public it was
+readable on GitHub. Creating logins is now refused when the variable is unset
+rather than falling back to a weak default.
 
 They sign in with it and get **exactly one** self-service change, made from **My Profile**.
 Changing it requires the current password, so someone who finds an unattended session

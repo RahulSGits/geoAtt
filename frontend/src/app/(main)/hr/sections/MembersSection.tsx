@@ -15,12 +15,29 @@ import {
   Spinner,
 } from '@/components/ui'
 import { formatDateTime } from '@/lib/format'
-import { DEFAULT_PASSWORD, MIN_PASSWORD_LENGTH } from '@/lib/types'
+import { MIN_PASSWORD_LENGTH } from '@/lib/types'
+
+/**
+ * The onboarding password, fetched rather than imported.
+ *
+ * This module is `'use client'`, so importing the value would compile the
+ * company's starting credential into the browser bundle — which is exactly how
+ * it leaked. The action behind this is HR-guarded.
+ *
+ * Falls back to prose rather than throwing: a toast that cannot name the
+ * password is a much smaller problem than an account creation that appears to
+ * have failed after it already succeeded.
+ */
+async function sharedPassword(): Promise<string> {
+  const res = await getOnboardingPassword()
+  return res.ok ? res.data : 'the configured onboarding password'
+}
 import {
   createEmployeeLogin,
   createMissingLogins,
   deleteMember,
   getMemberImpact,
+  getOnboardingPassword,
   inviteMember,
   listMembers,
   sendPasswordReset,
@@ -78,7 +95,7 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
       const { created, skipped, remaining } = res.data
       if (created > 0) {
         toast.success(
-          `Created ${created} login${created === 1 ? '' : 's'}. Everyone signs in with ${DEFAULT_PASSWORD} and changes it from My Profile.`,
+          `Created ${created} login${created === 1 ? '' : 's'}. Everyone signs in with ${await sharedPassword()} and changes it from My Profile.`,
         )
       }
       if (skipped.length > 0) {
@@ -159,7 +176,7 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
 
       if (role === 'employee') {
         toast.success(
-          `Login created for ${member.full_name || member.email}. They sign in with ${DEFAULT_PASSWORD}.`,
+          `Login created for ${member.full_name || member.email}. They sign in with ${await sharedPassword()}.`,
         )
         setSavingId(null)
         return
@@ -174,7 +191,7 @@ export default function MembersSection({ isAdmin }: { isAdmin: boolean }) {
     if (res.ok) {
       toast.success(
         member.hasLogin === false
-          ? `Login created for ${member.full_name || member.email} and set to ${role}. Starting password: ${DEFAULT_PASSWORD}`
+          ? `Login created for ${member.full_name || member.email} and set to ${role}. Starting password: ${await sharedPassword()}`
           : `${member.full_name || member.email} is now ${role}.`,
       )
       const after = await listMembers()

@@ -15,7 +15,12 @@ import {
   sendTestEmail,
   usingSandboxSender,
 } from '@/lib/email'
-import { DEFAULT_PASSWORD, MIN_PASSWORD_LENGTH } from '@/lib/types'
+import { MIN_PASSWORD_LENGTH } from '@/lib/types'
+import {
+  ONBOARDING_PASSWORD_HELP,
+  describeOnboardingPassword,
+  onboardingPassword,
+} from '@/lib/onboarding'
 import type { ActionResult } from '@/lib/types'
 
 function fail(error: string): ActionResult<never> {
@@ -314,12 +319,14 @@ export async function createEmployeeLogin(
     // The shared starting password, matching inviteMember.
     //
     // This used to be generatePassword(), so the two ways of onboarding someone
-    // handed out different passwords: an invite gave finbud@123 while "Create
+    // handed out different passwords: an invite gave the shared one while "Create
     // login" gave a random string shown once in a toast. For a bulk import
     // that is unusable — nobody can tell 119 people their individual string.
     // HR may still pass an explicit password to override it.
     const supplied = String(formData.get('password') ?? '')
-    const password = supplied.length >= MIN_PASSWORD_LENGTH ? supplied : DEFAULT_PASSWORD
+    const shared = onboardingPassword()
+    if (supplied.length < MIN_PASSWORD_LENGTH && !shared) return fail(ONBOARDING_PASSWORD_HELP)
+    const password = supplied.length >= MIN_PASSWORD_LENGTH ? supplied : shared!
 
     // Always an employee account. Granting HR or admin is a separate, explicit
     // act -- an administrator changes the portal from Members & access, where
@@ -395,7 +402,7 @@ export async function createEmployeeLogin(
 }
 
 // A per-account random-password generator lived here. Both onboarding paths now
-// start everyone on DEFAULT_PASSWORD, by explicit decision: this deployment has
+// start everyone on the shared onboarding password, by explicit decision: this deployment has
 // no email provider, so a password nobody can be told is a password nobody can
 // use. Reinstate it (and wire it into createEmployeeLogin) once RESEND_API_KEY
 // is set and invites can carry a link instead.
@@ -1683,7 +1690,7 @@ export interface BulkLoginResult {
  * people who cannot sign in with any password — the account does not exist.
  * Doing that one at a time is not a realistic ask, hence this.
  *
- * Everyone starts on DEFAULT_PASSWORD with `password_created: false`, exactly
+ * Everyone starts on the shared onboarding password with `password_created: false`, exactly
  * as "Create login" does for a single person, and gets one self-service change
  * from My Profile. Roles are NOT granted here: every account is an employee,
  * and an administrator promotes individuals afterwards from Members & access.
@@ -1713,6 +1720,11 @@ export async function createMissingLogins(): Promise<ActionResult<BulkLoginResul
     const skipped: { email: string; reason: string }[] = []
     let created = 0
 
+    // Resolved once, before the loop: failing on row 60 of 119 would leave the
+    // roster half-onboarded with no way to tell which half.
+    const shared = onboardingPassword()
+    if (!shared) return fail(ONBOARDING_PASSWORD_HELP)
+
     for (const row of roster) {
       const email = String(row.email ?? '').trim().toLowerCase()
       const name = String(row.full_name ?? '').trim()
@@ -1724,7 +1736,7 @@ export async function createMissingLogins(): Promise<ActionResult<BulkLoginResul
 
       const { data: made, error: createError } = await admin.auth.admin.createUser({
         email,
-        password: DEFAULT_PASSWORD,
+        password: shared,
         email_confirm: true,
         user_metadata: {
           full_name: name,
@@ -2044,9 +2056,12 @@ export async function inviteMember(
     // use "Set password" on the members list to give them something unique and
     // pass it on directly. Once RESEND_API_KEY is set, invites switch to a link
     // automatically (see the email branch below) and this stops mattering.
+    const invitePassword = onboardingPassword()
+    if (!invitePassword) return fail(ONBOARDING_PASSWORD_HELP)
+
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email,
-      password: DEFAULT_PASSWORD,
+      password: invitePassword,
       email_confirm: true,
       user_metadata: {
         full_name: name,
@@ -2107,7 +2122,7 @@ export async function inviteMember(
       name,
       link: hashed ? confirmLink(hashed, 'recovery') : `${siteUrl()}/login`,
       invitedBy: session.name,
-      ...(hashed ? {} : { defaultPassword: DEFAULT_PASSWORD }),
+      ...(hashed ? {} : { defaultPassword: invitePassword }),
     })
     return { ok: true, data: { emailed: sent.ok } }
   } catch (err) {
@@ -2410,6 +2425,26 @@ export async function deleteMember(
     refresh()
     revalidatePath('/admin')
     return { ok: true, data: { name: outcome.full_name || expectedEmail, login } }
+  } catch (err) {
+    return toResult(err)
+  }
+}
+
+/**
+ * The current onboarding password, for the toasts that tell HR what to relay.
+ *
+ * Exists so `MembersSection` — a `'use client'` module — never imports the
+ * value directly. Importing it there compiled the company's starting credential
+ * into the JavaScript bundle served to every browser, which is how it leaked
+ * before. Guarded like every other HR action, so it is not readable by an
+ * anonymous caller poking at server-action endpoints.
+ */
+export async function getOnboardingPassword(): Promise<ActionResult<string>> {
+  try {
+    await requireRole('hr')
+    const value = onboardingPassword()
+    if (!value) return fail(ONBOARDING_PASSWORD_HELP)
+    return { ok: true, data: value }
   } catch (err) {
     return toResult(err)
   }

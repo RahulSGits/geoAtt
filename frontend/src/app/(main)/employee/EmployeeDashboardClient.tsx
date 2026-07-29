@@ -661,6 +661,8 @@ export default function EmployeeDashboardClient({
         <ProfileSection
           employee={employee}
           email={email}
+          name={userProfile.name}
+          avatarUrl={avatarUrl}
           site={site}
           shift={shift}
           enrolled={enrolled}
@@ -936,6 +938,8 @@ function LeavesSection({ leaves, disabled }: { leaves: Leave[]; disabled: boolea
 function ProfileSection({
   employee,
   email,
+  name,
+  avatarUrl,
   site,
   shift,
   enrolled,
@@ -945,6 +949,10 @@ function ProfileSection({
 }: {
   employee: Employee | null
   email: string
+  /** Display name, used for the avatar's initials fallback. */
+  name: string
+  /** Signed URL for the profile picture, resolved on the server. */
+  avatarUrl: string | null
   site: Site | null
   shift: Shift | null
   enrolled: boolean
@@ -1117,7 +1125,7 @@ function ProfileSection({
           </Panel>
 
           <Panel title="Profile picture">
-            <ProfilePicture name={userProfile.name} initialUrl={avatarUrl} />
+            <ProfilePicture name={name} initialUrl={avatarUrl} />
           </Panel>
 
           <ChangePassword firstLogin={firstLogin} />

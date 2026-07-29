@@ -121,7 +121,7 @@ leave no trail.
 
 | # | Severity | Finding |
 | --- | --- | --- |
-| S1 | **High** | `DEFAULT_PASSWORD = 'finbud@123'` is hardcoded in `lib/types.ts` — and this repository is **public**. Every new HR and employee account starts on it. Anyone reading GitHub knows the starting credential for a 600-person company. |
+| S1 | **High** | `DEFAULT_PASSWORD` is a hardcoded literal in `lib/types.ts` — and this repository is **public**. Every new HR and employee account starts on it, and because `lib/types.ts` is imported by `'use client'` components it also shipped in the browser bundle. **Fixed in a later commit; the value must still be rotated, because git history is public.** |
 | S2 | Low | `getEmailCapability()` is the one server action with no guard. Server Actions are POST endpoints reachable by anyone who knows the action ID, so it leaks two deployment-config booleans to unauthenticated callers. |
 | S3 | Medium | No application-level rate limiting on sign-in. `/api/geocode` throttles and `lib/reauth.ts` throttles, but the login path relies entirely on Supabase's own limits. |
 | S4 | Medium | The service-role key is used in four places. Each use is justified (inviting users, writing rows before a session exists), but it bypasses **all** RLS, so each call site is a place where a missing role check becomes total compromise. Currently guarded — needs to stay that way, and should move behind the FastAPI backend. |
