@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — make notifications work in both directions, for every role
+-- geoAtt — make notifications work in both directions, for every role
 --
 -- Fixes two faults in 20260728000000_notifications_realtime.sql:
 --

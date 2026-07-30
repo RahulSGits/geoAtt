@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — APPLY STEP 2 of 2  (run APPLY_STEP_1.sql first, and let it commit)
+-- geoAtt — APPLY STEP 2 of 2  (run APPLY_STEP_1.sql first, and let it commit)
 --
 -- Every migration after the admin-role enum, concatenated in dependency order.
 -- All of it is idempotent, so running this on a partially-migrated database is
@@ -18,7 +18,7 @@
 -- SOURCE: 20260721000000_finatt_full_schema.sql
 -- ==========================================================================
 -- ============================================================================
--- FinAtt — consolidated schema migration
+-- geoAtt — consolidated schema migration
 --
 -- Safe to run repeatedly on an existing project. It:
 --   1. Fixes the 42P17 "infinite recursion detected in policy for relation
@@ -561,7 +561,7 @@ update public.employees e
 -- SOURCE: 20260722000000_shift_work_mode.sql
 -- ==========================================================================
 -- ============================================================================
--- FinAtt — work mode on shifts
+-- geoAtt — work mode on shifts
 --
 -- Small delta on top of 20260721000000_finatt_full_schema.sql, so it can be
 -- pasted on its own without re-running the 500-line base migration.
@@ -603,7 +603,7 @@ comment on column public.shifts.work_mode is
 -- SOURCE: 20260723000000_login_tracking.sql
 -- ==========================================================================
 -- ============================================================================
--- FinAtt — portal sign-in tracking
+-- geoAtt — portal sign-in tracking
 --
 -- HR is the top role: there is no separate admin. These counters and the
 -- diagnostics they feed are gated on is_hr(), which the base migration already
@@ -727,7 +727,7 @@ select role::text as role, count(*) as accounts,
 -- SOURCE: 20260724000000_face_enroll_attempts.sql
 -- ==========================================================================
 -- ============================================================================
--- FinAtt — limit face registration attempts
+-- geoAtt — limit face registration attempts
 --
 -- An employee may register their face twice. After that the portal refuses
 -- further attempts until HR explicitly grants another, which stops someone
@@ -794,7 +794,7 @@ select employee_id, full_name, face_enroll_attempts,
 -- SOURCE: 20260725000000_attendance_work_mode.sql
 -- ==========================================================================
 -- ============================================================================
--- FinAtt — record how each day was actually worked
+-- geoAtt — record how each day was actually worked
 --
 -- Employees whose assignment allows it may choose On-site or Work from home at
 -- check-in. Storing the choice per day (rather than inferring it from the site)
@@ -823,7 +823,7 @@ create index if not exists attendance_work_mode_idx on public.attendance (work_m
 -- SOURCE: 20260726000000_reward_points.sql
 -- ==========================================================================
 -- ============================================================================
--- FinAtt — punctuality reward points
+-- geoAtt — punctuality reward points
 --
 -- 3 points for checking in on time (or early) while on site. A ledger table
 -- records every award so a balance can always be explained, and so the unique
@@ -904,7 +904,7 @@ grant execute on function public.award_points(integer, text, date) to authentica
 -- SOURCE: 20260727000000_re_checkin.sql
 -- ==========================================================================
 -- ============================================================================
--- FinAtt — re-check-in (multiple sessions per day)
+-- geoAtt — re-check-in (multiple sessions per day)
 --
 -- An employee may check out and back in again (lunch, an errand, a split
 -- shift). Each completed session is banked into `accumulated_minutes` before
@@ -982,7 +982,7 @@ create trigger attendance_compute_status
 -- SOURCE: 20260728000000_notifications_realtime.sql
 -- ==========================================================================
 -- ============================================================================
--- FinAtt — employee notifications + realtime delivery
+-- geoAtt — employee notifications + realtime delivery
 --
 -- Gives every HR action that touches an employee a durable notification the
 -- employee can see and dismiss, and puts notifications + announcements on the
@@ -1063,7 +1063,7 @@ end $$;
 -- SOURCE: 20260729000000_recheckin_requests.sql
 -- ==========================================================================
 -- ============================================================================
--- FinAtt — re-check-in requires approval
+-- geoAtt — re-check-in requires approval
 --
 -- After checking out, an employee must REQUEST a re-check-in; HR/admin approves
 -- it before the employee can start another session. The state lives on the
@@ -1093,7 +1093,7 @@ comment on column public.attendance.recheckin_status is
 -- SOURCE: 20260731000000_role_management.sql
 -- ==========================================================================
 -- ============================================================================
--- FinAtt — step 2 of 2: admin tier + role management.
+-- geoAtt — step 2 of 2: admin tier + role management.
 --
 -- Run 20260730000000_admin_role.sql FIRST and let it commit. Safe to re-run.
 --

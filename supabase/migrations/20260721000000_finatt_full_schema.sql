@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — consolidated schema migration
+-- geoAtt — consolidated schema migration
 --
 -- Safe to run repeatedly on an existing project. It:
 --   1. Fixes the 42P17 "infinite recursion detected in policy for relation

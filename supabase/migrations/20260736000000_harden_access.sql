@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — close the privilege-escalation holes the deletion work exposed.
+-- geoAtt — close the privilege-escalation holes the deletion work exposed.
 --
 -- Three findings, all of which make an "admin only" rule elsewhere decorative:
 --

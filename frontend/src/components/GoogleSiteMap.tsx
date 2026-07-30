@@ -34,7 +34,7 @@ export default function GoogleSiteMap({
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''
 
   const { isLoaded, loadError } = useJsApiLoader({
-    id: 'finatt-google-maps',
+    id: 'geoatt-google-maps',
     googleMapsApiKey: apiKey,
   })
 

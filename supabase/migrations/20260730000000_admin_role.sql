@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — step 1 of 2: add the `admin` role label.
+-- geoAtt — step 1 of 2: add the `admin` role label.
 --
 -- Its own file on purpose: PostgreSQL refuses to USE a new enum label in the
 -- same transaction that added it, and the Supabase SQL editor runs a script as

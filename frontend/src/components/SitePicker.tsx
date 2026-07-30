@@ -17,9 +17,9 @@ const GoogleMapView = dynamic(() => import('./GoogleSiteMap'), {
 })
 
 type Provider = 'osm' | 'google' | 'satellite'
-const STORAGE_KEY = 'finatt.mapProvider'
+const STORAGE_KEY = 'geoatt.mapProvider'
 
-const PROVIDER_EVENT = 'finatt:mapprovider'
+const PROVIDER_EVENT = 'geoatt:mapprovider'
 
 function subscribeToProvider(onChange: () => void) {
   window.addEventListener(PROVIDER_EVENT, onChange)

@@ -158,7 +158,7 @@ interface EmployeeInput {
 /**
  * A usable employee code.
  *
- * Deliberately permissive. FinAtt generates `EMP-0001`, but an imported roster
+ * Deliberately permissive. geoAtt generates `EMP-0001`, but an imported roster
  * carries whatever the previous system used — `ND33004`, `2024/117`, `E_88` —
  * and rejecting those made the importer refuse entire files for no good reason.
  * The only real requirements are that a code is short, has no whitespace (it is
@@ -2013,7 +2013,7 @@ async function supabaseNotify(recipientId: string, actorName: string): Promise<v
 }
 
 /**
- * Create an account and grant it a portal — the only route into FinAtt now
+ * Create an account and grant it a portal — the only route into geoAtt now
  * that public sign-up is gone.
  *
  * New accounts start on the shared default password with password_created

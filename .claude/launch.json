@@ -1,47 +1,36 @@
 {
   "version": "0.0.1",
+  "//": "Every command begins `cd /` because the launcher can inherit a working directory that no longer exists — this project's folder was renamed from 'FinAtt app' to 'geoAtt', and any shell still holding the old path floods stderr with getcwd/chdir errors that bury the real failure. Plain `bash -c`, not `-lc`: a login shell runs profile scripts before the cd and hits the same problem.",
   "configurations": [
     {
-      "name": "finatt-web",
-      "//": "Plain `bash -c`, not `-lc`: a login shell runs profile scripts first and, when the launcher's inherited cwd is unreadable, floods stderr with getcwd/chdir errors that bury the real failure.",
-      "//autoPort": "3000 is held by the FinBud-LiveKit dev server, so take any free port. The dev script is `next dev -H 0.0.0.0` with no -p flag, which lets Next pick up the PORT env var the launcher assigns. NOTE: Supabase only redirects to allow-listed origins, so sign-in stays broken on a non-3000 port until NEXT_PUBLIC_SITE_URL and the Supabase redirect allowlist are updated to match.",
+      "name": "geoatt-web",
+      "//": "The Next.js app. NOTE: Next 16 refuses to start when another `next dev` is running anywhere on the machine — including the unrelated checkouts at ~/Downloads/FinAtt and ~/Downloads/FinBud-Ai. If startup fails with 'Another next dev server is already running', kill the PID it names.",
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "cd /Users/rahul/Downloads/FinAtt/frontend && exec npm run dev"
+        "cd / && cd '/Users/rahul/Downloads/geoAtt/frontend' && exec npm run dev"
       ],
       "autoPort": true,
       "port": 3000
     },
     {
-      "name": "finatt-app-web",
-      "//": "This checkout. The `finatt-web` entry above points at the sibling ~/Downloads/FinAtt, which is what currently holds port 3000.",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-c",
-        "cd '/Users/rahul/Downloads/FinAtt app/frontend' && exec npm run dev"
-      ],
-      "autoPort": true,
-      "port": 3000
-    },
-    {
-      "name": "finatt-rn-web",
+      "name": "geoatt-rn-web",
       "//": "The Expo app on its React Native Web target. Lets the splash animation and auth screens be checked in a browser without Xcode or an Android emulator.",
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "cd '/Users/rahul/Downloads/FinAtt app/mobile-rn' && exec npx expo start --web --port $PORT"
+        "cd / && cd '/Users/rahul/Downloads/geoAtt/mobile-rn' && exec npx expo start --web --port $PORT"
       ],
       "autoPort": true,
       "port": 8081
     },
     {
-      "name": "finatt-rn-dist",
-      "//": "Serves the PRODUCTION web export from mobile-rn/dist, so `npm run build:web` output can be checked before it goes to Firebase Hosting. Dev-server success does not prove the production bundle boots.",
+      "name": "geoatt-rn-dist",
+      "//": "Serves the PRODUCTION web export from mobile-rn/dist, so `npm run build:web` output can be checked before it goes to hosting. Dev-server success does not prove the production bundle boots, and this reproduces the SPA rewrite that a plain static server does not.",
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "cd / && exec node '/Users/rahul/Downloads/FinAtt app/mobile-rn/tools/serve-dist.mjs' $PORT"
+        "cd / && exec node '/Users/rahul/Downloads/geoAtt/mobile-rn/tools/serve-dist.mjs' $PORT"
       ],
       "autoPort": true,
       "port": 8090

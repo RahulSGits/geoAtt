@@ -35,7 +35,7 @@ const COLUMN_ALIASES: Record<keyof ParsedEmployee, string[]> = {
   joiningDate: ['joining date', 'joined', 'start date', 'joining_date', 'doj', 'hire date'],
 }
 
-export const TEMPLATE_FILENAME = 'finatt-employee-template.csv'
+export const TEMPLATE_FILENAME = 'geoatt-employee-template.csv'
 
 /**
  * The downloadable starter file.
@@ -425,7 +425,7 @@ export default function CsvImport({
         </p>
         <ul className="muted mt-2 space-y-1 text-xs">
           <li>
-            <strong>Employee ID</strong> — leave blank to let FinAtt allocate the next
+            <strong>Employee ID</strong> — leave blank to let geoAtt allocate the next
             code (EMP-0001, EMP-0002…). A code already on the roster is skipped.
           </li>
           <li>

@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — work mode on shifts
+-- geoAtt — work mode on shifts
 --
 -- Small delta on top of 20260721000000_finatt_full_schema.sql, so it can be
 -- pasted on its own without re-running the 500-line base migration.

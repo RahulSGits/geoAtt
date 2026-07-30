@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Applies every pending FinAtt migration to the Supabase database, in order.
+# Applies every pending geoAtt migration to the Supabase database, in order.
 #
 # Reads the connection string from SUPABASE_DB_URL in frontend/.env.local, which
 # is gitignored. The value is never printed, never passed on a command line

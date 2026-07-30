@@ -111,7 +111,7 @@ export default function AIChatWidget({
     <>
       <button
         onClick={() => setOpen(true)}
-        aria-label="Ask FinAtt AI"
+        aria-label="Ask geoAtt AI"
         className="touch-target rounded-lg transition-colors cursor-pointer"
         style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}
       >
@@ -132,7 +132,7 @@ export default function AIChatWidget({
                 />
                 <motion.div
                   role="dialog"
-                  aria-label="FinAtt AI assistant"
+                  aria-label="geoAtt AI assistant"
                   initial={{ opacity: 0, y: 20, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 20, scale: 0.97 }}
@@ -148,7 +148,7 @@ export default function AIChatWidget({
                         <Sparkles size={15} />
                       </span>
                       <div>
-                        <h3 className="text-sm font-semibold">FinAtt AI</h3>
+                        <h3 className="text-sm font-semibold">geoAtt AI</h3>
                         <p className="text-[11px]" style={{ color: 'var(--success)' }}>
                           Connected to your live data
                         </p>

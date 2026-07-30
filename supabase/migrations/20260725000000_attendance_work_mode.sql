@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — record how each day was actually worked
+-- geoAtt — record how each day was actually worked
 --
 -- Employees whose assignment allows it may choose On-site or Work from home at
 -- check-in. Storing the choice per day (rather than inferring it from the site)

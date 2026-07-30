@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — punctuality reward points
+-- geoAtt — punctuality reward points
 --
 -- 3 points for checking in on time (or early) while on site. A ledger table
 -- records every award so a balance can always be explained, and so the unique

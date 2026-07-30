@@ -1,5 +1,5 @@
 -- ===========================================================================
--- FinAtt — consolidated fixes, 2026-07-26.
+-- geoAtt — consolidated fixes, 2026-07-26.
 -- GENERATED from migrations/ in filename order. Edit those, not this file.
 -- Run in: Supabase dashboard -> SQL Editor -> paste -> Run. Idempotent.
 --
@@ -13,7 +13,7 @@
 -- ###########################################################################
 
 -- ============================================================================
--- FinAtt — permanently repair auth.users rows GoTrue cannot scan.
+-- geoAtt — permanently repair auth.users rows GoTrue cannot scan.
 --
 -- Symptom, verbatim from this project's Supabase logs on 2026-07-26:
 --
@@ -218,7 +218,7 @@ order by u.email;
 -- ###########################################################################
 
 -- ============================================================================
--- FinAtt — authorised account deletion.
+-- geoAtt — authorised account deletion.
 --
 -- Who may delete what:
 --
@@ -579,7 +579,7 @@ grant execute on function public.member_delete_impact(uuid) to authenticated;
 -- ###########################################################################
 
 -- ============================================================================
--- FinAtt — close the privilege-escalation holes the deletion work exposed.
+-- geoAtt — close the privilege-escalation holes the deletion work exposed.
 --
 -- Three findings, all of which make an "admin only" rule elsewhere decorative:
 --
@@ -772,7 +772,7 @@ select tablename, policyname, cmd
 -- ###########################################################################
 
 -- ============================================================================
--- FinAtt — let the CSV import carry an employee code and an intended portal.
+-- geoAtt — let the CSV import carry an employee code and an intended portal.
 --
 -- The importer creates roster rows only; the login comes later, from "Send
 -- invite" or "Create login". So a Role column in the CSV has nowhere to live at

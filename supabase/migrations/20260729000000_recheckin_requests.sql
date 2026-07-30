@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — re-check-in requires approval
+-- geoAtt — re-check-in requires approval
 --
 -- After checking out, an employee must REQUEST a re-check-in; HR/admin approves
 -- it before the employee can start another session. The state lives on the

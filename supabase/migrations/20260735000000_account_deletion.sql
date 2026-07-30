@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — authorised account deletion.
+-- geoAtt — authorised account deletion.
 --
 -- Who may delete what:
 --

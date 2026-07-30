@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — repair and seed the three demo accounts
+-- geoAtt — repair and seed the three demo accounts
 --
 --   admin@demo.com     / demo1234  -> admin      (full access)
 --   hr@demo.com        / demo1234  -> hr         (workforce management)

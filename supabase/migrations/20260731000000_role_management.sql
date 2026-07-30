@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — step 2 of 2: admin tier + role management.
+-- geoAtt — step 2 of 2: admin tier + role management.
 --
 -- Run 20260730000000_admin_role.sql FIRST and let it commit. Safe to re-run.
 --

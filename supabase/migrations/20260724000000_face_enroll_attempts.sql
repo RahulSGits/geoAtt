@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — limit face registration attempts
+-- geoAtt — limit face registration attempts
 --
 -- An employee may register their face twice. After that the portal refuses
 -- further attempts until HR explicitly grants another, which stops someone

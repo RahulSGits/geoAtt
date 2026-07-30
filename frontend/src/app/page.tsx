@@ -109,7 +109,7 @@ export default function Landing() {
           >
             <Fingerprint size={19} />
           </span>
-          <span className="text-lg font-semibold">FinAtt</span>
+          <span className="text-lg font-semibold">geoAtt</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -170,7 +170,7 @@ export default function Landing() {
           </h1>
 
           <p className="muted mt-5 max-w-md text-lg">
-            Timesheets rely on trust. FinAtt replaces it with evidence: it confirms the
+            Timesheets rely on trust. geoAtt replaces it with evidence: it confirms the
             person, the place and the hour before a single minute is recorded — then turns
             that record into reporting your payroll team can sign off on.
           </p>
@@ -332,7 +332,7 @@ export default function Landing() {
               }}
             >
               <Info size={13} />
-              About FinAtt
+              About geoAtt
             </span>
 
             <h2 className="mt-5 text-2xl font-bold tracking-tight sm:text-3xl">
@@ -347,7 +347,7 @@ export default function Landing() {
                 dishonest so much as unverifiable, and it all lands in payroll the same way.
               </p>
               <p>
-                FinAtt closes that gap without making the day harder. Checking in takes one
+                geoAtt closes that gap without making the day harder. Checking in takes one
                 tap: the camera confirms the face against a template enrolled once, the
                 device confirms the location sits inside the site&apos;s geofence, and the
                 shift rules decide whether the day counts as on time, late or half. Every
@@ -409,7 +409,7 @@ export default function Landing() {
       </section>
 
       <footer className="muted border-t border-[var(--border)] py-8 text-center text-sm">
-        <p>FinAtt — Attendance &amp; Workforce Management</p>
+        <p>geoAtt — Attendance &amp; Workforce Management</p>
         <p className="mt-1 text-xs">
           Face templates are stored as mathematical descriptors, never as photographs.
         </p>

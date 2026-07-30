@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — employee codes supplied by the CSV import must stay unique.
+-- geoAtt — employee codes supplied by the CSV import must stay unique.
 --
 -- The importer now accepts an Employee ID from the file instead of always
 -- generating EMP-000n. Two rows claiming the same code would make the code stop

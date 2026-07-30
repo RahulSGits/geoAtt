@@ -230,7 +230,7 @@ export async function login(formData: FormData): Promise<AuthActionState> {
       // the shared password forever because nothing says an account is missing.
       //
       // This does confirm the address is on the roster, which the generic
-      // message deliberately hides. Accepted here: FinAtt has no public
+      // message deliberately hides. Accepted here: geoAtt has no public
       // sign-up, so an imported employee already knows they are in the system,
       // and the alternative is every one of them filing a support ticket.
       if (/invalid.*credential/i.test(result.error.message) && (await isRosterOnly(email))) {

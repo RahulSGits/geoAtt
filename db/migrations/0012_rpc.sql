@@ -105,7 +105,12 @@ revoke all on function public.grant_face_reenrolment(uuid, text) from public;
 grant execute on function public.grant_face_reenrolment(uuid, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- email_for_login — resolve an employee code OR email to an email address.
+-- email_for_login — resolve an employee CODE to an email address.
+--
+-- It deliberately does not handle emails: the caller passes whatever was typed,
+-- and a null result means "not a code", so the sign-in path falls through and
+-- uses the input as an email directly. That fallthrough is also what makes the
+-- next line true.
 --
 -- SECURITY DEFINER because the caller has no session yet, so RLS would hide the
 -- row. Deliberately minimal: it takes no password and returns only an email,

@@ -42,8 +42,14 @@ export const radius = {
  */
 export const splashTiming = {
   plateIn: 0,
-  ringDraw: 240,
-  markDraw: 560,
+  /** When the fingerprint starts drawing. */
+  ridgeDraw: 240,
+  /**
+   * How long the whole stack of ridges takes. One animation sweeps across all
+   * of them, so this is the total rather than the per-ridge duration — the
+   * centre-outward stagger falls out of the sweep.
+   */
+  ridgeDuration: 900,
   wordmarkIn: 900,
   taglineIn: 1120,
   pulse: 1560,

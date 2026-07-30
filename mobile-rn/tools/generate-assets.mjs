@@ -4,17 +4,18 @@
  *
  *   npm run icons
  *
- * The geometry below is the SAME geometry as components/GeoAttLogo.tsx, in the
- * same 0..1 unit space. That is the whole point: the native splash shows this
- * PNG, then app/index.tsx fades in the SVG version on top. If the two drift the
- * handoff visibly jumps, so edit both together.
+ * The geometry is read from lib/logo-geometry.json — the same file
+ * components/GeoAttLogo.tsx reads to draw the SVG — in the same 0..1 unit
+ * space. That is the whole point: the native splash shows this PNG, then
+ * app/index.tsx fades in the SVG version on top. If the two ever used separate
+ * copies the handoff would visibly jump; editing the JSON keeps both in step.
  *
  * No dependencies — SDF rasterisation plus Node's built-in zlib. The usual
  * choice, sharp, needs a libvips binary that will not install on every machine.
  */
 
 import { deflateSync } from 'node:zlib'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -26,15 +27,15 @@ const PLATE_TO = [0x1d, 0x4e, 0xd8] // brandDark
 const BACKDROP = [0x0a, 0x12, 0x30] // backdrop[0]
 const WHITE = [0xff, 0xff, 0xff]
 
-// ── geometry — mirrors components/GeoAttLogo.tsx ───────────────────────────
-const RING_R = 0.44
-const RING_HALF_W = 0.015
-const MARK_POINTS = [
-  [0.32, 0.515],
-  [0.445, 0.64],
-  [0.69, 0.36],
-]
-const MARK_HALF_W = 0.045
+// ── geometry ───────────────────────────────────────────────────────────────
+// Read from lib/logo-geometry.json, which is the ONLY definition of the mark —
+// components/GeoAttLogo.tsx reads the same file. Only the algorithms differ
+// (SVG arc paths there, signed distance fields here). When the numbers were
+// duplicated instead, the native splash visibly jumped as it handed over to
+// the animated one.
+const GEOMETRY = JSON.parse(readFileSync(resolve(ROOT, 'lib/logo-geometry.json'), 'utf8'))
+const RIDGES = GEOMETRY.ridges
+const RIDGE_HALF_W = GEOMETRY.halfWidth
 
 // ── PNG encoding ───────────────────────────────────────────────────────────
 const CRC_TABLE = (() => {
@@ -87,22 +88,49 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v)
 const coverage = (d, aa) => clamp01(0.5 - d / aa)
 const lerp = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t))
 
-function sdSegment(px, py, ax, ay, bx, by) {
-  const abx = bx - ax
-  const aby = by - ay
-  const t = clamp01(((px - ax) * abx + (py - ay) * aby) / (abx * abx + aby * aby))
-  return Math.hypot(px - ax - abx * t, py - ay - aby * t)
+const rad = (deg) => (deg * Math.PI) / 180
+
+// Arc centre, NOT the plate's own (0.5, 0.5) — see the "//center" note in
+// logo-geometry.json. Must match lib/logo-geometry.ts's CX/CY exactly.
+const CX = GEOMETRY.cx
+const CY = GEOMETRY.cy
+
+const pointAt = (r, deg) => [CX + r * Math.cos(rad(deg)), CY + r * Math.sin(rad(deg))]
+
+/**
+ * Distance from a point to one fingerprint ridge.
+ *
+ * Inside the ridge's angular span the nearest point is radial. Outside it, the
+ * nearest point is whichever endpoint is closer — which gives the stroke round
+ * caps for free, matching strokeLinecap="round" on the SVG side.
+ */
+function ridgeDistance(x, y, ridge) {
+  const dx = x - CX
+  const dy = y - CY
+  const dist = Math.hypot(dx, dy)
+
+  // Normalise the point's angle into the same turn as a0, so a ridge that
+  // crosses 360° (most of them do) still compares correctly.
+  let deg = (Math.atan2(dy, dx) * 180) / Math.PI
+  while (deg < ridge.a0) deg += 360
+  while (deg > ridge.a0 + 360) deg -= 360
+
+  if (deg <= ridge.a1) return Math.abs(dist - ridge.r) - RIDGE_HALF_W
+
+  const [ex0, ey0] = pointAt(ridge.r, ridge.a0)
+  const [ex1, ey1] = pointAt(ridge.r, ridge.a1)
+  return Math.min(Math.hypot(x - ex0, y - ey0), Math.hypot(x - ex1, y - ey1)) - RIDGE_HALF_W
 }
 
+/** The whole fingerprint as one field: the nearest ridge wins. */
 function markDistance(x, y) {
-  const [a, b, c] = MARK_POINTS
-  return (
-    Math.min(sdSegment(x, y, a[0], a[1], b[0], b[1]), sdSegment(x, y, b[0], b[1], c[0], c[1])) -
-    MARK_HALF_W
-  )
+  let best = Infinity
+  for (const ridge of RIDGES) {
+    const d = ridgeDistance(x, y, ridge)
+    if (d < best) best = d
+  }
+  return best
 }
-
-const ringDistance = (x, y) => Math.abs(Math.hypot(x - 0.5, y - 0.5) - RING_R) - RING_HALF_W
 
 /**
  * @param shape 'plate'      circular gradient plate + ring + check (splash mark)
@@ -139,7 +167,7 @@ function render(size, shape) {
       const y = (gy - 0.5) / scale + 0.5
 
       const disc = coverage(Math.hypot(x - 0.5, y - 0.5) - 0.5, aa)
-      const glyph = Math.max(coverage(ringDistance(x, y), aa), coverage(markDistance(x, y), aa))
+      const glyph = coverage(markDistance(x, y), aa)
 
       if (shape === 'mono') {
         // Silhouette only — the launcher tints one flat shape.
@@ -179,7 +207,7 @@ function renderFavicon(size) {
       const x = (px + 0.5) / size
       const y = (py + 0.5) / size
       const plate = coverage(Math.hypot(x - 0.5, y - 0.5) - 0.5, aa)
-      const glyph = Math.max(coverage(ringDistance(x, y), aa), coverage(markDistance(x, y), aa))
+      const glyph = coverage(markDistance(x, y), aa)
       const [r, g, b] = lerp(PLATE_FROM, PLATE_TO, clamp01((x + y) / 2))
       for (let ch = 0; ch < 3; ch++) {
         const over = [r, g, b][ch] * (1 - glyph) + WHITE[ch] * glyph
@@ -207,4 +235,4 @@ write('assets/android-icon-foreground.png', render(1024, 'foreground'))
 write('assets/android-icon-monochrome.png', render(1024, 'mono'))
 write('assets/favicon.png', renderFavicon(64))
 
-console.log('\nGeometry mirrors components/GeoAttLogo.tsx — edit both together.')
+console.log('\nGeometry is lib/logo-geometry.json — one definition, shared with the SVG.')

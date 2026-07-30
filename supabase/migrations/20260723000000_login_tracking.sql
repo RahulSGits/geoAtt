@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — portal sign-in tracking
+-- geoAtt — portal sign-in tracking
 --
 -- HR is the top role: there is no separate admin. These counters and the
 -- diagnostics they feed are gated on is_hr(), which the base migration already

@@ -47,11 +47,11 @@ export default function LoginPage() {
             >
               <Fingerprint size={19} />
             </span>
-            <span className="font-semibold">FinAtt</span>
+            <span className="font-semibold">geoAtt</span>
           </Link>
 
           <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
-          <p className="muted mt-2">Sign in to your FinAtt dashboard.</p>
+          <p className="muted mt-2">Sign in to your geoAtt dashboard.</p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             {error && <Alert tone="error">{error}</Alert>}

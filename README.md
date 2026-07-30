@@ -1,4 +1,4 @@
-# FinAtt — Attendance & Workforce Platform
+# geoAtt — Attendance & Workforce Platform
 
 A Next.js 16 web app for face-verified, geofenced attendance, backed entirely by Supabase.
 
@@ -8,7 +8,7 @@ geofence — with the face match and the fence **re-checked on the server**, so 
 client request cannot mark someone present. Worked hours, lateness and the daily status
 (Present / Half day / Late / WFH / Absent) are computed by a Postgres trigger.
 
-FinAtt is an internal tool: there is no public sign-up. Accounts are created by an
+geoAtt is an internal tool: there is no public sign-up. Accounts are created by an
 administrator, who also decides which portal each person lands on.
 
 ## Tech Stack
@@ -81,7 +81,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 # Email. EMAIL_FROM must be quoted — the angle brackets are shell redirects otherwise.
 RESEND_API_KEY=<resend key>
-EMAIL_FROM="FinAtt <noreply@yourdomain.com>"
+EMAIL_FROM="geoAtt <noreply@yourdomain.com>"
 
 # Optional: the AI assistant, and the Google Maps provider for the site editor.
 GEMINI_API_KEY=<key>

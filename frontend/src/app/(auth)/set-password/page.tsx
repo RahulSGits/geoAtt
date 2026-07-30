@@ -5,7 +5,7 @@ import SetPasswordForm from './SetPasswordForm'
 
 export const dynamic = 'force-dynamic'
 
-/** How each portal is described to someone who has not seen FinAtt yet. */
+/** How each portal is described to someone who has not seen geoAtt yet. */
 const PORTALS = {
   admin: { label: 'Admin', blurb: 'Full access, including members and access', icon: Shield },
   hr: { label: 'HR', blurb: 'People, attendance, leave and sites', icon: ShieldCheck },
@@ -58,7 +58,7 @@ export default async function SetPasswordPage() {
           </span>
           <h1 className="mt-4 text-2xl font-bold tracking-tight">Set your password</h1>
           <p className="muted mt-2 text-sm">
-            {profile?.full_name ? `Welcome, ${profile.full_name}. ` : 'Welcome to FinAtt. '}
+            {profile?.full_name ? `Welcome, ${profile.full_name}. ` : 'Welcome to geoAtt. '}
             Choose a password to finish setting up your account.
           </p>
         </div>

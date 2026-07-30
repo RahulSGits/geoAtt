@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — re-check-in (multiple sessions per day)
+-- geoAtt — re-check-in (multiple sessions per day)
 --
 -- An employee may check out and back in again (lunch, an errand, a split
 -- shift). Each completed session is banked into `accumulated_minutes` before

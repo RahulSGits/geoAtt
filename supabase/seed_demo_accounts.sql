@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — demo accounts
+-- geoAtt — demo accounts
 --
 -- Run this AFTER 20260721000000_finatt_full_schema.sql.
 -- Creates (or resets) two sign-in-ready accounts:

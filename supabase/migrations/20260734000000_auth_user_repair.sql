@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — permanently repair auth.users rows GoTrue cannot scan.
+-- geoAtt — permanently repair auth.users rows GoTrue cannot scan.
 --
 -- Symptom, verbatim from this project's Supabase logs on 2026-07-26:
 --

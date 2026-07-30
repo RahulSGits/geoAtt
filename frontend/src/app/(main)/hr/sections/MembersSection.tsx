@@ -54,7 +54,7 @@ const ROLES = [
 ] as const
 
 /**
- * The people directory: everyone with a FinAtt account.
+ * The people directory: everyone with a geoAtt account.
  *
  * HR sees the same list and can onboard employees and send reset links, but
  * portal assignment stays with administrators — the buttons render read-only.
@@ -820,7 +820,7 @@ function DeleteMemberForm({
     <div className="space-y-3">
       <Alert tone="error">
         This cannot be undone. The account, its portal access and everything linked to it
-        are removed, and they lose access to FinAtt immediately.
+        are removed, and they lose access to geoAtt immediately.
       </Alert>
 
       {impact === null && !error ? (
@@ -861,7 +861,7 @@ function DeleteMemberForm({
 
       {impact?.last_admin && (
         <Alert tone="warning">
-          This is the last administrator. Promote someone else to admin first, or FinAtt
+          This is the last administrator. Promote someone else to admin first, or geoAtt
           would be left with nobody who can manage access.
         </Alert>
       )}
@@ -898,7 +898,7 @@ function DeleteMemberForm({
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Your FinAtt password"
+          placeholder="Your geoAtt password"
           autoComplete="current-password"
           disabled={blocked}
           className="field"

@@ -8,8 +8,8 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 
 export const metadata: Metadata = {
   title: {
-    default: 'FinAtt — Attendance & Workforce Platform',
-    template: '%s · FinAtt',
+    default: 'geoAtt — Attendance & Workforce Platform',
+    template: '%s · geoAtt',
   },
   description:
     'Face-verified, geofenced attendance with a full shift engine, leave workflow and live analytics.',

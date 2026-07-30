@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — sign in with an employee ID, and admin-gated password resets
+-- geoAtt — sign in with an employee ID, and admin-gated password resets
 --
 -- Run after APPLY_STEP_2.sql. Safe to run repeatedly.
 -- ============================================================================

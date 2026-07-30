@@ -2,7 +2,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ===========================================================================
-   FinAtt design tokens
+   geoAtt design tokens
    Palette: blue data surface + amber highlight (ui-ux-pro-max recommendation
    for an operations dashboard). Density dial 8/10 -> 4-32px spacing scale.
    Every foreground/background pair below clears WCAG AA 4.5:1 for body text.

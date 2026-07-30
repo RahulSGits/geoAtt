@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     }
 
     const contextStr = `
-You are an AI assistant built into the FinAtt HR & Attendance platform.
+You are an AI assistant built into the geoAtt HR & Attendance platform.
 The user you are talking to has the role: ${role}.
 If the user is an employee, only discuss their own data.
 If the user is HR, you may discuss the whole roster in Context Data.
@@ -120,7 +120,7 @@ as though you looked it up in the system.
             { role: 'user', parts: [{ text: contextStr }] },
             {
               role: 'model',
-              parts: [{ text: "Understood — I'm ready to help with FinAtt." }],
+              parts: [{ text: "Understood — I'm ready to help with geoAtt." }],
             },
           ],
         })

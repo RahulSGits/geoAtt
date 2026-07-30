@@ -116,7 +116,7 @@ function shell(heading: string, body: string, cta?: { label: string; url: string
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;border:1px solid #d8e0ec;">
       <tr>
         <td style="padding:28px 32px 8px;">
-          <div style="font-size:18px;font-weight:700;color:${BRAND};letter-spacing:-0.2px;">FinAtt</div>
+          <div style="font-size:18px;font-weight:700;color:${BRAND};letter-spacing:-0.2px;">geoAtt</div>
         </td>
       </tr>
       <tr>
@@ -146,7 +146,7 @@ function shell(heading: string, body: string, cta?: { label: string; url: string
         <td style="padding:24px 32px 28px;">
           <hr style="border:none;border-top:1px solid #d8e0ec;margin:0 0 16px;">
           <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7889;">
-            FinAtt — Attendance &amp; Workforce Management.<br>
+            geoAtt — Attendance &amp; Workforce Management.<br>
             If you weren't expecting this email you can safely ignore it.
           </p>
         </td>
@@ -172,30 +172,30 @@ export function sendInviteEmail(opts: {
     const pw = escapeHtml(opts.defaultPassword)
     return send({
       to: opts.to,
-      subject: 'Your FinAtt account is ready',
+      subject: 'Your geoAtt account is ready',
       html: shell(
-        'Your FinAtt account is ready',
+        'Your geoAtt account is ready',
         `<p style="margin:0 0 12px;">${greeting}</p>
-         <p style="margin:0 0 12px;">You've been added to FinAtt${by}. Sign in with your email address and this temporary password:</p>
+         <p style="margin:0 0 12px;">You've been added to geoAtt${by}. Sign in with your email address and this temporary password:</p>
          <p style="margin:0 0 12px;font-family:ui-monospace,Menlo,monospace;font-size:16px;font-weight:600;">${pw}</p>
          <p style="margin:0;">Change it from <strong>My Profile</strong> once you are in. You get one change, so pick something you will remember — after that an administrator has to reset it for you.</p>`,
         { label: 'Sign in', url: opts.link },
       ),
-      text: `${greeting}\n\nYou've been added to FinAtt${by ? ` by ${opts.invitedBy}` : ''}.\n\nSign in at ${opts.link} with your email address and this temporary password:\n\n  ${opts.defaultPassword}\n\nChange it from My Profile once you are in. You get one change — after that an administrator has to reset it for you.\n\n— FinAtt`,
+      text: `${greeting}\n\nYou've been added to geoAtt${by ? ` by ${opts.invitedBy}` : ''}.\n\nSign in at ${opts.link} with your email address and this temporary password:\n\n  ${opts.defaultPassword}\n\nChange it from My Profile once you are in. You get one change — after that an administrator has to reset it for you.\n\n— geoAtt`,
     })
   }
 
   return send({
     to: opts.to,
-    subject: 'Set up your FinAtt account',
+    subject: 'Set up your geoAtt account',
     html: shell(
-      'Your FinAtt account is ready',
+      'Your geoAtt account is ready',
       `<p style="margin:0 0 12px;">${greeting}</p>
-       <p style="margin:0 0 12px;">You've been added to FinAtt${by}. Set a password to activate your account, then you can check in, view your attendance and request leave.</p>
+       <p style="margin:0 0 12px;">You've been added to geoAtt${by}. Set a password to activate your account, then you can check in, view your attendance and request leave.</p>
        <p style="margin:0;">This link expires in 24 hours.</p>`,
       { label: 'Set my password', url: opts.link },
     ),
-    text: `${greeting}\n\nYou've been added to FinAtt${by ? ` by ${opts.invitedBy}` : ''}. Set your password here (link expires in 24 hours):\n\n${opts.link}\n\n— FinAtt`,
+    text: `${greeting}\n\nYou've been added to geoAtt${by ? ` by ${opts.invitedBy}` : ''}. Set your password here (link expires in 24 hours):\n\n${opts.link}\n\n— geoAtt`,
   })
 }
 
@@ -203,13 +203,13 @@ export function sendInviteEmail(opts: {
 export function sendTestEmail(to: string): Promise<SendResult> {
   return send({
     to,
-    subject: 'FinAtt email is working',
+    subject: 'geoAtt email is working',
     html: shell(
       'Email is configured correctly',
-      `<p style="margin:0 0 12px;">This is a test message from your FinAtt deployment.</p>
+      `<p style="margin:0 0 12px;">This is a test message from your geoAtt deployment.</p>
        <p style="margin:0;">Invite and leave-decision emails will be delivered the same way.</p>`,
     ),
-    text: 'This is a test message from your FinAtt deployment. Email is configured correctly.',
+    text: 'This is a test message from your geoAtt deployment. Email is configured correctly.',
   })
 }
 
@@ -237,7 +237,7 @@ export function sendLeaveDecisionEmail(opts: {
        <strong>${escapeHtml(opts.startDate)}</strong> to <strong>${escapeHtml(opts.endDate)}</strong>
        was <strong>${opts.decision}</strong>.</p>
        ${opts.note ? `<p style="margin:0 0 12px;padding:12px;background:#f5f7fb;border-radius:8px;">${escapeHtml(opts.note)}</p>` : ''}`,
-      { label: 'Open FinAtt', url: `${opts.appUrl}/employee` },
+      { label: 'Open geoAtt', url: `${opts.appUrl}/employee` },
     ),
     text: `Hi ${opts.name},\n\nYour ${opts.leaveType} leave from ${opts.startDate} to ${opts.endDate} was ${opts.decision}.${opts.note ? `\n\nNote: ${opts.note}` : ''}\n\n${opts.appUrl}/employee`,
   })
@@ -265,14 +265,14 @@ export function sendPasswordResetEmail(opts: {
 
   return send({
     to: opts.to,
-    subject: 'Reset your FinAtt password',
+    subject: 'Reset your geoAtt password',
     html: shell(
       'Choose a new password',
       `<p style="margin:0 0 12px;">${greeting}</p>
-       <p style="margin:0 0 12px;">A password reset was requested for your FinAtt account${by}. Follow the link to choose a new one.</p>
+       <p style="margin:0 0 12px;">A password reset was requested for your geoAtt account${by}. Follow the link to choose a new one.</p>
        <p style="margin:0;">This link expires in 24 hours. If you did not expect this, you can ignore this email — your current password stays active until the link is used.</p>`,
       { label: 'Choose a new password', url: opts.link },
     ),
-    text: `${greeting}\n\nA password reset was requested for your FinAtt account${by ? ` by ${opts.resetBy}` : ''}. Choose a new password here (expires in 24 hours):\n\n${opts.link}\n\nIf you did not expect this, ignore this email.\n\n— FinAtt`,
+    text: `${greeting}\n\nA password reset was requested for your geoAtt account${by ? ` by ${opts.resetBy}` : ''}. Choose a new password here (expires in 24 hours):\n\n${opts.link}\n\nIf you did not expect this, ignore this email.\n\n— geoAtt`,
   })
 }

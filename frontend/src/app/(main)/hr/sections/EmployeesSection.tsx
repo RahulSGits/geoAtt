@@ -454,7 +454,7 @@ function EmployeeForm({
           name="employeeCode"
           required
           defaultValue={employee?.employee_id ?? ''}
-          hint="Their code from your own system, e.g. ND33563. Must be unique — FinAtt no longer invents one."
+          hint="Their code from your own system, e.g. ND33563. Must be unique — geoAtt no longer invents one."
         />
         {mode === 'create' ? (
           <Field label="Email" name="email" type="email" required />

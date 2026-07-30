@@ -186,7 +186,7 @@ export default function DashboardShell({
               FA
             </span>
             <div className="hidden min-w-0 sm:block">
-              <div className="truncate text-sm font-semibold leading-tight">FinAtt</div>
+              <div className="truncate text-sm font-semibold leading-tight">geoAtt</div>
               <div className="muted truncate text-xs">{roleLabel}</div>
             </div>
           </div>
@@ -366,7 +366,7 @@ function SidebarContent({
           <Fingerprint size={19} />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold leading-tight">FinAtt</div>
+          <div className="truncate text-sm font-semibold leading-tight">geoAtt</div>
           <div className="muted truncate text-xs">{roleLabel}</div>
         </div>
       </div>

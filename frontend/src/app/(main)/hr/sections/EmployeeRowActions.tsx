@@ -258,7 +258,7 @@ export default function EmployeeRowActions({
 
           {impact?.hasLogin && (
             <Alert tone="warning">
-              Their sign-in account is removed too — they lose access to FinAtt
+              Their sign-in account is removed too — they lose access to geoAtt
               immediately and cannot log back in.
             </Alert>
           )}
@@ -300,7 +300,7 @@ export default function EmployeeRowActions({
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Your FinAtt password"
+              placeholder="Your geoAtt password"
               autoComplete="current-password"
               className="field"
               onKeyDown={(e) => {

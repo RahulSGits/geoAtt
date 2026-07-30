@@ -17,7 +17,7 @@ import { getSession } from '@/lib/auth'
 
 const NOMINATIM = 'https://nominatim.openstreetmap.org'
 const CONTACT = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-const USER_AGENT = `FinAtt-Attendance/1.0 (${CONTACT})`
+const USER_AGENT = `geoAtt-Attendance/1.0 (${CONTACT})`
 
 /** Nominatim asks for no more than one request per second, per application. */
 const MIN_INTERVAL_MS = 1100

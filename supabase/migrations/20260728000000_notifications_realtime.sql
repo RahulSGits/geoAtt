@@ -1,5 +1,5 @@
 -- ============================================================================
--- FinAtt — employee notifications + realtime delivery
+-- geoAtt — employee notifications + realtime delivery
 --
 -- Gives every HR action that touches an employee a durable notification the
 -- employee can see and dismiss, and puts notifications + announcements on the
