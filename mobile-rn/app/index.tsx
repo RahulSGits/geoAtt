@@ -46,9 +46,9 @@ export default function SplashRoute() {
   }, [])
 
   const leave = useCallback(() => {
-    // `ready` gates on Firebase replaying persisted auth. If it has not settled
-    // by the time the animation ends we still leave — /login redirects itself
-    // once state arrives, which beats holding the user on a frozen splash.
+    // `ready` gates on Supabase replaying the persisted session. If it has not
+    // settled by the time the animation ends we still leave — /login redirects
+    // itself once state arrives, which beats holding the user on a frozen splash.
     router.replace(user ? '/home' : '/login')
   }, [router, user])
 

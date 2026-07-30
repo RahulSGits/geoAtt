@@ -25,7 +25,11 @@ export default function HomeRoute() {
     if (ready && !user) router.replace('/login')
   }, [ready, user, router])
 
-  const greeting = user?.displayName?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'there'
+  // Supabase keeps the display name in user_metadata — the invite flow writes
+  // `full_name` there, the same field the web app's profiles trigger reads.
+  const fullName =
+    typeof user?.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : ''
+  const greeting = fullName.split(' ')[0] || user?.email?.split('@')[0] || 'there'
 
   return (
     <Screen>

@@ -1,14 +1,17 @@
 /**
- * Serves the production web export locally, the way Firebase Hosting will.
+ * Serves the production web export locally, the way real hosting will.
  *
  *   npm run serve:web            # after npm run build:web
  *   PORT=8090 npm run serve:web
  *
  * Why this exists rather than `python3 -m http.server`: it reproduces the SPA
- * rewrite from firebase.json. `web.output` is "single", so /login has no file
- * on disk — a plain static server 404s it and you only discover that after
- * deploying. Here an unknown path falls through to index.html, exactly as
- * hosting does, so deep links and refreshes are actually exercised.
+ * rewrite any host serving this build must be configured with. `web.output` is
+ * "single", so /login has no file on disk — a plain static server 404s it and
+ * you only discover that after deploying. Here an unknown path falls through
+ * to index.html, exactly as hosting should, so deep links and refreshes are
+ * actually exercised. (Whatever host you deploy dist/ to needs the same
+ * catch-all rewrite to /index.html, plus long-cache on /_expo/** and no-cache
+ * on index.html.)
  *
  * Paths are resolved relative to this file, never process.cwd().
  */

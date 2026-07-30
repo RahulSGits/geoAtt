@@ -18,19 +18,22 @@ import GeoAttLogo from '../components/GeoAttLogo'
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from '../components/Icons'
 import Screen from '../components/Screen'
 import { authErrorMessage, useAuth } from '../lib/auth'
-import { isFirebaseConfigured } from '../lib/firebase'
+import { isSupabaseConfigured } from '../lib/supabase'
 import { colors, radius } from '../lib/theme'
 
-type Mode = 'signIn' | 'register'
-
+/**
+ * Sign-in only, by design. geoAtt has no public registration on any platform:
+ * accounts are provisioned by an administrator or HR, so this screen offers no
+ * way to create one — not a hidden way, no way. The auth layer (lib/auth.tsx)
+ * has no register function either, so a future edit cannot quietly wire a
+ * sign-up form back in.
+ */
 export default function LoginRoute() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { user, ready, signIn, register, resetPassword } = useAuth()
+  const { user, ready, signIn, resetPassword } = useAuth()
 
-  const [mode, setMode] = useState<Mode>('signIn')
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [reveal, setReveal] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -46,19 +49,14 @@ export default function LoginRoute() {
     setError(null)
     setNotice(null)
 
-    if (!email.trim() || !password) {
-      setError('Enter your email and password.')
-      return
-    }
-    if (mode === 'register' && !name.trim()) {
-      setError('Enter your name.')
+    if (!identifier.trim() || !password) {
+      setError('Enter your email or employee ID, and your password.')
       return
     }
 
     setBusy(true)
     try {
-      if (mode === 'signIn') await signIn(email, password)
-      else await register(name, email, password)
+      await signIn(identifier, password)
       router.replace('/home')
     } catch (err) {
       setError(authErrorMessage(err))
@@ -68,14 +66,16 @@ export default function LoginRoute() {
   }
 
   async function forgot() {
-    if (!email.trim()) {
-      setError('Enter your email first, then tap Forgot password.')
+    // Reset links only work against an email address — an employee ID would
+    // need resolving first, and doing that here would leak which IDs exist.
+    if (!identifier.trim() || !identifier.includes('@')) {
+      setError('Enter your email address first, then tap Forgot password.')
       return
     }
     setError(null)
     setBusy(true)
     try {
-      await resetPassword(email)
+      await resetPassword(identifier)
       // Deliberately unconditional: confirming whether an address is registered
       // would turn this into an account-enumeration oracle.
       setNotice('If that email has an account, a reset link is on its way.')
@@ -85,8 +85,6 @@ export default function LoginRoute() {
       setBusy(false)
     }
   }
-
-  const isRegister = mode === 'register'
 
   return (
     <Screen>
@@ -109,42 +107,29 @@ export default function LoginRoute() {
           </Animated.View>
 
           <Animated.View entering={FadeInUp.duration(560).delay(120)} style={styles.card}>
-            <Text style={styles.title}>{isRegister ? 'Create account' : 'Welcome back'}</Text>
+            <Text style={styles.title}>Welcome back</Text>
             <Text style={styles.subtitle}>
-              {isRegister
-                ? 'Set up your geoAtt account to start marking attendance.'
-                : 'Sign in to mark attendance and view your records.'}
+              Sign in to mark attendance and view your records.
             </Text>
 
-            {!isFirebaseConfigured && (
+            {!isSupabaseConfigured && (
               <View style={styles.warn}>
                 <Text style={styles.warnText}>
-                  Firebase isn&apos;t configured yet. Copy .env.example to .env and add your
-                  project keys — sign-in stays disabled until then.
+                  Supabase isn&apos;t configured yet. Copy .env.example to .env and add the
+                  project URL and publishable key — sign-in stays disabled until then.
                 </Text>
               </View>
             )}
 
-            {isRegister && (
-              <Field
-                icon={<MailIcon />}
-                placeholder="Full name"
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-                textContentType="name"
-              />
-            )}
-
             <Field
               icon={<MailIcon />}
-              placeholder="Email address"
-              value={email}
-              onChangeText={setEmail}
+              placeholder="Email or employee ID"
+              value={identifier}
+              onChangeText={setIdentifier}
               autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              textContentType="emailAddress"
+              autoComplete="username"
+              autoCorrect={false}
+              textContentType="username"
             />
 
             <Field
@@ -154,7 +139,7 @@ export default function LoginRoute() {
               onChangeText={setPassword}
               secureTextEntry={!reveal}
               autoCapitalize="none"
-              textContentType={isRegister ? 'newPassword' : 'password'}
+              textContentType="password"
               trailing={
                 <Pressable
                   onPress={() => setReveal((v) => !v)}
@@ -172,53 +157,39 @@ export default function LoginRoute() {
 
             <Pressable
               onPress={submit}
-              disabled={busy || !isFirebaseConfigured}
+              disabled={busy || !isSupabaseConfigured}
               style={({ pressed }) => [
                 styles.cta,
-                (busy || !isFirebaseConfigured) && styles.ctaDisabled,
+                (busy || !isSupabaseConfigured) && styles.ctaDisabled,
                 pressed && styles.ctaPressed,
               ]}
               accessibilityRole="button"
               // Explicit, because while `busy` the only child is a spinner —
               // the button would otherwise go unnamed exactly when it matters.
-              accessibilityLabel={isRegister ? 'Create account' : 'Log in'}
-              accessibilityState={{ disabled: busy || !isFirebaseConfigured, busy }}
+              accessibilityLabel="Log in"
+              accessibilityState={{ disabled: busy || !isSupabaseConfigured, busy }}
             >
               {busy ? (
                 <ActivityIndicator color={colors.onBrand} />
               ) : (
-                <Text style={styles.ctaText}>{isRegister ? 'CREATE ACCOUNT' : 'LOGIN'}</Text>
+                <Text style={styles.ctaText}>LOGIN</Text>
               )}
             </Pressable>
 
-            {!isRegister && (
-              <Pressable
-                onPress={forgot}
-                disabled={busy}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Forgot password"
-              >
-                <Text style={styles.link}>Forgot password?</Text>
-              </Pressable>
-            )}
+            <Pressable
+              onPress={forgot}
+              disabled={busy}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Forgot password"
+            >
+              <Text style={styles.link}>Forgot password?</Text>
+            </Pressable>
 
-            <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>
-                {isRegister ? 'Already have an account?' : 'New to geoAtt?'}
+            <View style={styles.footerRow}>
+              <Text style={styles.footerText}>
+                No account? Access is provisioned by your administrator or HR.
               </Text>
-              <Pressable
-                onPress={() => {
-                  setMode(isRegister ? 'signIn' : 'register')
-                  setError(null)
-                  setNotice(null)
-                }}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={isRegister ? 'Switch to sign in' : 'Switch to create account'}
-              >
-                <Text style={styles.switchAction}>{isRegister ? 'Sign in' : 'Create one'}</Text>
-              </Pressable>
             </View>
           </Animated.View>
         </ScrollView>
@@ -324,15 +295,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  switchRow: {
+  footerRow: {
     marginTop: 18,
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: colors.hairline,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 5,
   },
-  switchLabel: { color: colors.inkMuted, fontSize: 13 },
-  switchAction: { color: colors.brand, fontSize: 13, fontWeight: '700' },
+  footerText: {
+    textAlign: 'center',
+    color: colors.inkFaint,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
 })
