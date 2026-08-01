@@ -10,9 +10,50 @@ const isPublic = (path: string) =>
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
+  const path = request.nextUrl.pathname
+
+  const redirectTo = (pathname: string) => {
+    const url = request.nextUrl.clone()
+    url.pathname = pathname
+    url.search = ''
+    return NextResponse.redirect(url)
+  }
+
+  /**
+   * Config check, before anything can throw.
+   *
+   * These used to be read with `!`, which is an assertion to the compiler and
+   * nothing at runtime. When a variable is missing or misspelled in the hosting
+   * environment they are `undefined`, `createServerClient(undefined, undefined)`
+   * throws — and because this runs as middleware on every matched route, that
+   * single exception returned a bare "Internal Server Error" for the entire
+   * site, /login included. There was no way in from a browser and no clue why.
+   *
+   * Now it degrades instead: public routes still render, protected ones send
+   * you to /login, and the log names the exact variable to fix. A
+   * misconfiguration should cost you the signed-in area, not the whole site.
+   */
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+
+  if (!url || !key) {
+    const missing = [
+      !url && 'NEXT_PUBLIC_SUPABASE_URL',
+      !key && 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    ].filter(Boolean)
+
+    console.error(
+      `[proxy] Supabase is not configured — missing ${missing.join(' and ')}. ` +
+        'Set it in the hosting environment and redeploy; env vars are read at ' +
+        'build time, so an existing deployment will not pick up a new value. ' +
+        'Names are matched exactly — a misspelling reads as undefined.',
+    )
+    return isPublic(path) ? supabaseResponse : redirectTo('/login')
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    url,
+    key,
     {
       cookies: {
         getAll() {
@@ -30,19 +71,26 @@ export async function updateSession(request: NextRequest) {
   )
 
   // Refreshes the session if it has expired.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  //
+  // Guarded because this is a network call. An unreachable project, a DNS
+  // blip or a paused Supabase instance rejects rather than returning an
+  // error field, and an unhandled rejection in middleware is a 500 for every
+  // route at once. Treating a failure as "no session" costs a signed-in user
+  // a redirect to /login; letting it throw costs everyone the site.
+  const result = await supabase.auth.getUser().catch((err: unknown) => {
+    console.error(
+      '[proxy] Supabase auth unreachable:',
+      err instanceof Error ? err.message : err,
+    )
+    return null
+  })
 
-  const path = request.nextUrl.pathname
-  const isAuthRoute = path === '/login'
-
-  const redirectTo = (pathname: string) => {
-    const url = request.nextUrl.clone()
-    url.pathname = pathname
-    url.search = ''
-    return NextResponse.redirect(url)
+  if (result === null) {
+    return isPublic(path) ? supabaseResponse : redirectTo('/login')
   }
+
+  const user = result.data.user
+  const isAuthRoute = path === '/login'
 
   if (!user) {
     return isPublic(path) ? supabaseResponse : redirectTo('/login')
