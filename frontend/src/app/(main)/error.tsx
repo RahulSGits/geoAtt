@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import Link from 'next/link'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 
 /**
@@ -55,12 +56,12 @@ export default function PortalError({
           <RefreshCw className="h-4 w-4" aria-hidden />
           Try again
         </button>
-        <a
+        <Link
           href="/"
           className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           Go back
-        </a>
+        </Link>
       </div>
     </div>
   )
