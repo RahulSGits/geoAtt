@@ -191,14 +191,20 @@ async function findOrCreate(table, name, row) {
 async function scaffoldEmployee(employee) {
   if (!employee) return
 
-  // Remote, not office. `sites_office_has_location` rejects an office row with
-  // null coordinates — correctly, because an unfenceable office would let a
-  // check-in succeed from anywhere while looking enforced. Inventing a lat/lng
-  // would be worse: it puts a real geofence somewhere arbitrary and refuses
-  // every genuine check-in. Remote is honest until a real location is set.
+  // Hybrid, not office and not remote.
+  //
+  // `sites_office_has_location` rejects an office row with null coordinates —
+  // correctly, since an unfenceable office would accept a check-in from
+  // anywhere while appearing enforced. Inventing coordinates would be worse: a
+  // real geofence somewhere arbitrary, refusing every genuine check-in.
+  //
+  // Remote was the first choice but it hides the map in the site editor, since
+  // only office and hybrid are location-restricted — so there was no way to
+  // set the real location from the UI. Hybrid shows the map, accepts null
+  // coordinates, and does not refuse anyone while the location is still blank.
   const siteId = await findOrCreate('sites', 'Head Office', {
     name: 'Head Office',
-    kind: 'remote',
+    kind: 'hybrid',
     is_active: true,
   })
 
