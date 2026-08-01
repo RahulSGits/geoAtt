@@ -7,10 +7,15 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
+    // Default ignores of eslint-config-next, but matched at ANY depth.
+    //
+    // The bare ".next/**" only covers the one at the project root. A build run
+    // while Turbopack had inferred a different workspace root wrote its output
+    // to src/.next instead, and 16 MB of generated chunks then linted as source
+    // — 295 errors and 6,162 warnings that had nothing to do with this codebase.
+    "**/.next/**",
+    "**/out/**",
+    "**/build/**",
     "next-env.d.ts",
     "*.js",
 
