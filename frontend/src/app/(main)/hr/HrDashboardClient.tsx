@@ -114,12 +114,10 @@ export default function HrDashboardClient({
   recentLogins: RecentLogin[]
   statsUnavailable: boolean
   setupSql: {
-    migration: string | null
-    repair: string | null
-    loginTracking: string | null
-    applyStep1: string | null
-    applyStep2: string | null
-    demoRoles: string | null
+    /** db/apply-all.sql — the whole schema, for a fresh project. */
+    schema: string | null
+    /** db/RUN-THIS-NOW.sql — the compatibility migration, 0014. */
+    compat: string | null
   }
   diagnostics: DiagnosticsData
 }) {

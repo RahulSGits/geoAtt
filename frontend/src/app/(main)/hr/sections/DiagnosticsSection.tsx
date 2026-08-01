@@ -7,8 +7,18 @@ import SqlBlock from '@/components/SqlBlock'
 import { Alert, PageHeader, Panel, Pill, Spinner } from '@/components/ui'
 import { sendDiagnosticEmail } from '../actions'
 
-const REPAIR_PATH = 'supabase/repair_broken_logins.sql'
-const MIGRATION_PATH = 'supabase/migrations/20260721000000_finatt_full_schema.sql'
+/**
+ * Paths shown next to each SQL block.
+ *
+ * They point at `db/`, the schema this app actually runs against. They used to
+ * point at `supabase/` — the previous project's migrations — which was worse
+ * than stale: pasting those into the current project fails with
+ * `42703: column "email" does not exist`, because the old schema assumes a
+ * column layout the new one arranges differently. Anyone following this tab in
+ * good faith was handed SQL that could not work.
+ */
+const SCHEMA_PATH = 'db/apply-all.sql'
+const COMPAT_PATH = 'db/RUN-THIS-NOW.sql'
 
 export interface DiagnosticsData {
   serviceKey: boolean
@@ -38,12 +48,10 @@ export default function DiagnosticsSection({
   diagnostics,
 }: {
   sql: {
-    migration: string | null
-    repair: string | null
-    loginTracking: string | null
-    applyStep1: string | null
-    applyStep2: string | null
-    demoRoles: string | null
+    /** db/apply-all.sql — the whole schema, for a fresh project. */
+    schema: string | null
+    /** db/RUN-THIS-NOW.sql — the compatibility migration, 0014. */
+    compat: string | null
   }
   diagnostics: DiagnosticsData
 }) {
@@ -79,96 +87,39 @@ export default function DiagnosticsSection({
       <div className="grid gap-4">
         <Panel
           title="Bring the database up to date"
-          subtitle="Run these two, in order — everything else on this tab is optional"
+          subtitle="Run the compatibility migration first — it is the usual fix"
         >
           <div className="space-y-4">
             <Alert tone="info">
-              Step 1 must run <strong>on its own</strong> and finish before step 2.
-              PostgreSQL refuses to use a newly added role value in the same
-              transaction that created it, and the SQL editor runs a whole script as
-              one transaction.
+              Paste <strong>only</strong> the SQL below. Anything under{' '}
+              <code className="text-xs">supabase/</code> belongs to the previous
+              project and will fail against this schema.
             </Alert>
 
             <div>
-              <p className="mb-2 text-xs font-semibold">Step 1 — add the admin role</p>
+              <p className="mb-2 text-xs font-semibold">
+                Fixes “column employees_1.full_name does not exist”
+              </p>
               <SqlBlock
-                sql={sql.applyStep1}
-                path="supabase/APPLY_STEP_1.sql"
-                label="Copy step 1"
-                note="One line. Run it, wait for success, then do step 2."
+                sql={sql.compat}
+                path={COMPAT_PATH}
+                label="Copy the fix"
+                note="Restores the column set this app reads, and keeps profiles and employees in step with triggers. Idempotent — safe to re-run."
               />
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-semibold">Step 2 — everything else</p>
+              <p className="mb-2 text-xs font-semibold">
+                Only for an empty project — the entire schema
+              </p>
               <SqlBlock
-                sql={sql.applyStep2}
-                path="supabase/APPLY_STEP_2.sql"
-                label="Copy step 2"
-                note="All remaining migrations in dependency order. Idempotent — safe on a partially-migrated database. Ends with a verification report."
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-semibold">Step 3 — fix the demo accounts</p>
-              <SqlBlock
-                sql={sql.demoRoles}
-                path="supabase/seed_demo_roles.sql"
-                label="Copy demo roles"
-                note="Sets admin@demo.com → admin, hr@demo.com → hr, employee@demo.com → employee, repairs missing sign-in identities, and reports the result."
+                sql={sql.schema}
+                path={SCHEMA_PATH}
+                label="Copy full schema"
+                note="Every table, view, function, policy and bucket in dependency order. Idempotent, so it is also safe over a partial database."
               />
             </div>
           </div>
-        </Panel>
-
-        <Panel
-          title="Repair broken sign-ins"
-          subtitle="For accounts that fail with “Database error querying schema”"
-        >
-          <div className="space-y-3">
-            <Alert tone="info">
-              An account inserted straight into <code className="text-xs">auth.users</code>{' '}
-              by raw SQL has no matching <code className="text-xs">auth.identities</code>{' '}
-              row. GoTrue joins identities during the password grant, so sign-in returns
-              HTTP 500 even though the password is correct — this is why{' '}
-              <code className="text-xs">employee@demo.com</code> fails while{' '}
-              <code className="text-xs">hr@demo.com</code> works.
-            </Alert>
-
-            <SqlBlock
-              sql={sql.repair}
-              path={REPAIR_PATH}
-              label="Copy repair SQL"
-              note="Rebuilds missing identities, confirms the demo emails, and backfills any missing profile and employee records. Safe to run repeatedly."
-            />
-
-            <p className="muted text-xs">
-              Paste it into the SQL Editor and press Run. The final SELECT reports each
-              account — <code className="text-xs">email_identities</code> and{' '}
-              <code className="text-xs">employee_rows</code> should both be 1.
-            </p>
-          </div>
-        </Panel>
-
-        <Panel
-          title="Sign-in tracking"
-          subtitle="Adds the counters behind the sign-in activity view"
-        >
-          <SqlBlock
-            sql={sql.loginTracking}
-            path="supabase/migrations/20260723000000_login_tracking.sql"
-            label="Copy login tracking SQL"
-            note="Adds the sign-in counters this console reports on."
-          />
-        </Panel>
-
-        <Panel title="Schema migration" subtitle="Already applied if the consoles show data">
-          <SqlBlock
-            sql={sql.migration}
-            path={MIGRATION_PATH}
-            label="Copy migration SQL"
-            note="Idempotent — re-running it is safe and will not duplicate anything."
-          />
         </Panel>
 
         <Panel

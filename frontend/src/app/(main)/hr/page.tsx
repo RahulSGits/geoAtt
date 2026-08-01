@@ -39,25 +39,37 @@ function isSetupError(error: { code?: string } | null): boolean {
   return Boolean(error?.code && SETUP_CODES.has(error.code))
 }
 
-/** SQL scripts, read only for the Diagnostics tab. */
+/**
+ * SQL scripts, read only for the Diagnostics tab.
+ *
+ * These come from `db/`, which is the schema this app runs against. They used
+ * to come from `supabase/` — the previous project's migrations — and that was
+ * actively harmful rather than merely stale: pasting them into the new project
+ * fails with
+ *
+ *   ERROR: 42703: column "email" does not exist
+ *   QUERY: create unique index ... on public.employees (lower(email))
+ *
+ * because the old schema assumes columns the new one arranges differently.
+ * Someone following Diagnostics in good faith was being handed SQL that could
+ * not work. `supabase/` is kept for reference only and is never surfaced here.
+ */
 async function readSetupSql() {
-  const root = path.join(process.cwd(), '..', 'supabase')
+  const root = path.join(process.cwd(), '..', 'db')
   const read = async (relative: string) => {
     try {
       return await readFile(path.join(root, relative), 'utf8')
     } catch {
+      // Absent in a deployed build — Next's file tracing does not follow reads
+      // outside the app directory. Diagnostics degrades to naming the path.
       return null
     }
   }
-  const [migration, repair, loginTracking, applyStep1, applyStep2] = await Promise.all([
-    read('migrations/20260721000000_finatt_full_schema.sql'),
-    read('repair_broken_logins.sql'),
-    read('migrations/20260723000000_login_tracking.sql'),
-    read('APPLY_STEP_1.sql'),
-    read('APPLY_STEP_2.sql'),
+  const [schema, compat] = await Promise.all([
+    read('apply-all.sql'),
+    read('RUN-THIS-NOW.sql'),
   ])
-  const demoRoles = await read('seed_demo_roles.sql')
-  return { migration, repair, loginTracking, applyStep1, applyStep2, demoRoles }
+  return { schema, compat }
 }
 
 export default async function HrPage() {
