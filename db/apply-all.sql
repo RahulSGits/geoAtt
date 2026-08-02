@@ -1694,6 +1694,16 @@ update public.profiles
 -- 2. employees — the column set the frontend selects with `select('*')`.
 -- ---------------------------------------------------------------------------
 
+-- Drop the dependent view FIRST. Postgres refuses to change the type of a
+-- column a view selects:
+--
+--   0A000: cannot alter type of a column used by a view or rule
+--   DETAIL: rule _RETURN on view v_employee_directory depends on column "status"
+--
+-- It is rebuilt in section 5 against the final column names, so this is a
+-- reorder rather than a loss.
+drop view if exists public.v_employee_directory;
+
 -- The frontend calls the human-facing code `employee_id`. 0004 named it
 -- employee_code. Rename rather than duplicate: two columns holding the same
 -- code is exactly the drift this migration exists to avoid.
@@ -1721,19 +1731,23 @@ alter table public.employees
   add column if not exists gender text,
   add column if not exists address text;
 
--- status: 0004 made this an enum, the frontend treats it as text and the CSV
--- importer can carry values the enum does not know. Widen to text so an import
--- cannot fail on an unexpected word.
-do $$ begin
-  if (select data_type from information_schema.columns
-       where table_schema = 'public' and table_name = 'employees'
-         and column_name = 'status') = 'USER-DEFINED' then
-    alter table public.employees
-      alter column status drop default,
-      alter column status type text using status::text;
-    alter table public.employees alter column status set default 'active';
-  end if;
-end $$;
+-- status stays the employment_status enum from 0004, deliberately.
+--
+-- The first version of this widened it to text so a CSV import could not fail
+-- on an unexpected word. Postgres refused:
+--
+--   0A000: cannot alter type of a column used by a view or rule
+--
+-- because four views select it — v_employee_directory, v_department_headcount,
+-- v_leave_queue and v_today_summary. Changing the type means dropping and
+-- rebuilding all four, which is a lot of moving parts for a convenience.
+--
+-- It is also the wrong trade. PostgREST returns an enum as a plain string, so
+-- `status === 'active'` and writing 'active' both work unchanged — the
+-- frontend cannot tell the difference. What the enum adds is rejecting a
+-- typo'd status outright instead of storing it, which is worth more than
+-- tolerating one. If an import ever does need a new value, add it to the enum
+-- rather than widening the column.
 
 -- ---------------------------------------------------------------------------
 -- 3. Face descriptors, back on the employee row.
