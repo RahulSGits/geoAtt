@@ -9,20 +9,11 @@ import { radius, type Palette } from '../lib/theme'
 /**
  * Front-camera capture for check-in.
  *
- * WHAT THIS DOES AND DOES NOT DO
- *
- * It captures a selfie and hands back JPEG bytes. It does **not** compute a
- * face descriptor or decide whether the face matches — that comparison needs
- * the same `face-api` `faceRecognitionNet` that produced the enrolled
- * templates, and no React Native library produces vectors comparable to them.
- * A different model would not be "close enough"; the numbers are not in the
- * same space, so every comparison would be meaningless rather than merely
- * inaccurate.
- *
- * So the selfie is evidence, not authentication: it goes to the private
- * attendance-selfies bucket against the check-in, where HR can review it, and
- * it is the input a server-side match endpoint would need when one exists.
- * Calling it verification here would be worse than not having it.
+ * This captures a selfie and hands back JPEG bytes — nothing more. The frame
+ * then goes two places: to `FaceMatcher`, which turns it into a face-api
+ * descriptor, and to the private attendance-selfies bucket as evidence HR can
+ * review. The match itself is decided by Postgres (`verify_my_face`), not here
+ * and not on the phone at all.
  *
  * The image is downscaled to 640px before upload. A modern phone camera
  * produces 3–8 MB per frame; at 600 employees checking in daily that is
@@ -93,7 +84,7 @@ export default function FaceCapture({ visible, onCancel, onCaptured }: Props) {
           <>
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="front" />
 
-            {/* Framing guide. Purely an aiming aid — nothing detects a face. */}
+            {/* Framing guide. An aiming aid only — detection happens after capture. */}
             <View pointerEvents="none" style={styles.guideWrap}>
               <View style={styles.guide} />
               <Text style={styles.guideText}>Centre your face in the circle</Text>

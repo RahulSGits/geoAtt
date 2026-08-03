@@ -394,8 +394,8 @@ export default function HomeRoute() {
               ) : (
                 <View style={styles.banner}>
                   <Text style={styles.bannerText}>
-                    Verified by location only. Face verification runs on the web portal — HR
-                    can see which check-ins were face-verified.
+                    Check-in is verified by location and by your face, against the template
+                    you enrolled on the web portal.
                   </Text>
                 </View>
               )}

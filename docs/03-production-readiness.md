@@ -5,55 +5,41 @@ something is unverified it says so.
 
 ---
 
-## 1. The blocker: mobile check-in does not verify a face
+## 1. Face verification
 
-**This is a decision you have to make, not a task I can finish.**
+Mobile check-in now refuses a face that does not match the enrolled template —
+the same rule the web enforces, against the same templates.
 
-The web refuses a check-in outright when the live descriptor does not match the
-enrolled template:
+**How it works.** The enrolled vectors come from `@vladmandic/face-api`'s
+`faceRecognitionNet`, and a descriptor is only comparable to others from that
+same model. So the app runs that exact JavaScript in a 0x0 offscreen WebView
+(`components/FaceMatcher.tsx`), loading `/models` from the deployed site. It is
+a compute surface, not a wrapper: nothing renders, nothing navigates, every
+pixel the user sees is native. The alternative was re-enrolling 600 employees
+against a different on-device model, which would have thrown away every
+existing template.
 
-```ts
-// frontend/src/app/(main)/employee/actions.ts
-if (matchDistance >= MATCH_THRESHOLD) {
-  return fail('Your face did not match the enrolled photo…')
-}
-```
+**The verdict is server-side.** The web gets its guarantee by re-comparing
+inside a server action. The app has no server action, so migration 0016 adds
+`verify_my_face()`: the phone sends a descriptor, Postgres returns
+`matched / distance / enrolled`, and the `face_match_score` written to
+`attendance` is the RPC's number. A modified client cannot assert its own
+match. The function reads only the caller's own template via
+`current_employee_id()`, so it is not an oracle for testing a face against the
+roster.
 
-The mobile app performs **no face check at all**. It verifies location and
-writes the same `attendance` row. So today the phone is a strictly weaker path
-to an identical record — an employee who cannot pass face verification on the
-web can simply use the app.
-
-That is a bypass of the control the product is built on, and it exists because
-of a real technical constraint: the enrolled templates come from
-`@vladmandic/face-api`'s `faceRecognitionNet`, and no React Native library
-produces vectors comparable to them. Matching on the phone needs either that
-model running in a JS runtime on-device (~6 MB of weights, slow on mid-range
-Android) or a server-side match endpoint.
-
-### What is in place now
-
-- The check-in card states plainly that it is location-verified only.
-- `attendance.face_match_score` stays **null** for mobile check-ins and holds a
-  distance for web ones, so the two are already distinguishable in the data.
-  HR can audit with:
+Both platforms now write a distance, so this audit no longer separates web from
+mobile — it separates verified from unverified:
 
 ```sql
-select date, employee_id, face_match_score is not null as face_verified
-from attendance where date >= current_date - 30;
+select date, employee_id, face_match_score
+from attendance
+where date >= current_date - 30 and face_match_score is null;
 ```
 
-### Your options, in order of safety
-
-1. **Server-side match endpoint.** Mobile captures a selfie, uploads it, and a
-   function running `face-api` returns the distance. Keeps one model and one
-   threshold. The right answer, and the most work.
-2. **Restrict mobile check-in to remote/hybrid sites**, where a geofence was
-   never the control anyway, and require the web at office sites.
-3. **Accept it explicitly**, with the banner and the audit query above.
-4. **Disable mobile check-in** until (1) ships.
-
-Doing nothing silently is the only option that is actually wrong.
+**Requires `EXPO_PUBLIC_SITE_URL`** in `mobile-rn/.env`, pointing at an HTTPS
+deployment that serves `/models`. Unset, the matcher falls back to
+`https://geo-att.vercel.app`.
 
 ---
 
@@ -64,8 +50,9 @@ Doing nothing silently is the only option that is actually wrong.
 | Web build | `next build` passes — 8 static, 6 dynamic routes |
 | Web lint / types | 0 errors, 0 warnings |
 | Mobile types | 0 errors |
+| Face verification | web and mobile, one model, server-side verdict |
 | Mobile web export | builds |
-| Schema | 15 migrations applied to the live project |
+| Schema | 16 migrations applied to the live project |
 | Auth | 3 roles verified end to end |
 | Sessions | Keychain / Keystore, chunked |
 | RLS | every table, admin-only audit log |
@@ -122,7 +109,6 @@ every on-site check-in earned punctuality points regardless of arrival.
 
 ## 4. Not built
 
-- Face verification on mobile (§1)
 - Push notifications — the Updates tab reads rows; nothing pushes
 - Calendar month-grid on attendance
 - Change password, profile picture, re-check-in requests
@@ -138,7 +124,10 @@ Stated so nobody assumes otherwise:
   machine. Everything mobile was verified on the React Native Web target, which
   exercises the same components and data layer but not native permissions,
   Keychain storage or haptics.
-- **Face check-in end to end** — needs HTTPS and a real camera.
+- **Face check-in end to end** — the RPC's maths is verified directly in
+  Postgres (identical vectors -> 0, a 3-4-5 triangle -> 5), but the full
+  capture -> descriptor -> verdict path needs a real camera and an HTTPS
+  deployment serving `/models`. Run it on a device before you rely on it.
 - **Email delivery** — `RESEND_API_KEY` is unset, so invites fall back to the
   shared password.
 - **Load at 600 employees.** The HR dashboard still runs `select('*')` on
