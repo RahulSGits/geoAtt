@@ -178,6 +178,7 @@ export async function checkIn(
   coords: Coords | null,
   workMode: 'on_site' | 'remote' = 'on_site',
   selfiePath: string | null = null,
+  faceMatchScore: number | null = null,
 ): Promise<void> {
   const { error } = await requireSupabase()
     .from('attendance')
@@ -194,6 +195,9 @@ export async function checkIn(
         // Object path, not a URL — see uploadSelfie. face_match_score stays
         // null: this app captures evidence but does not compute a descriptor.
         check_in_selfie: selfiePath,
+        // The distance Postgres computed, not a client claim. Null only when
+        // no descriptor could be produced at all.
+        face_match_score: faceMatchScore,
       },
       { onConflict: 'employee_id,date' },
     )
@@ -547,5 +551,33 @@ export async function uploadSelfie(
     return { path, error: null }
   } catch (err) {
     return { path: null, error: err instanceof Error ? err.message : 'Upload failed.' }
+  }
+}
+
+// ── Face verification ──────────────────────────────────────────────────────
+
+export type FaceVerdict = { matched: boolean; distance: number; enrolled: boolean }
+
+/**
+ * Ask Postgres whether a live descriptor matches the caller's enrolled face.
+ *
+ * The comparison deliberately happens server-side. The web gets this property
+ * by re-comparing inside a server action; without the equivalent here a
+ * modified client could simply skip the check and post an attendance row as
+ * anyone. The phone supplies a descriptor; the database returns the verdict.
+ *
+ * The RPC reads only the caller's own template, so it cannot be used to test a
+ * face against the whole roster.
+ */
+export async function verifyFace(descriptor: number[]): Promise<FaceVerdict> {
+  const { data, error } = await requireSupabase().rpc('verify_my_face', { live: descriptor })
+  if (error) throw error
+
+  // The function returns a single row; PostgREST gives it back as an array.
+  const row = Array.isArray(data) ? data[0] : data
+  return {
+    matched: Boolean(row?.matched),
+    distance: typeof row?.distance === 'number' ? row.distance : 999,
+    enrolled: Boolean(row?.enrolled),
   }
 }

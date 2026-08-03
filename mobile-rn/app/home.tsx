@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Pressable,
@@ -9,11 +9,13 @@ import {
   View,
 } from 'react-native'
 import { useRouter } from 'expo-router'
+import type { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import FaceCapture from '../components/FaceCapture'
+import FaceMatcher, { describeWith, type FaceResult } from '../components/FaceMatcher'
 import GeoAttLogo from '../components/GeoAttLogo'
 import LiveClock from '../components/LiveClock'
 import Screen from '../components/Screen'
@@ -44,6 +46,7 @@ import {
   allowedWorkModes,
   requestRecheckin,
   uploadSelfie,
+  verifyFace,
   monthStats,
   type Attendance,
   type Coords,
@@ -78,6 +81,10 @@ export default function HomeRoute() {
   const [notice, setNotice] = useState<string | null>(null)
   const [workMode, setWorkMode] = useState<'on_site' | 'remote'>('on_site')
   const [cameraOpen, setCameraOpen] = useState(false)
+  // The captured frame is held while the matcher works, so the write can use
+  // the same bytes the descriptor came from.
+  const pendingShot = useRef<string | null>(null)
+  const matcherRef = useRef<WebView>(null)
 
   useEffect(() => {
     if (!ready) return
@@ -183,31 +190,82 @@ export default function HomeRoute() {
     }
   }
 
-  /** Step two: upload the photo, then write the row. */
-  async function completeCheckIn(base64: string) {
+  /** Step two: hand the frame to the matcher for a descriptor. */
+  function onCaptured(base64: string) {
     setCameraOpen(false)
-    if (!state.employee || !user) return
+    pendingShot.current = base64
     setBusy(true)
-    setError(null)
-    try {
-      const coords = await readLocation()
-
-      // A failed upload must not cost someone their attendance — the selfie is
-      // evidence attached to the check-in, not the check-in itself.
-      const { path, error: uploadError } = await uploadSelfie(user.id, base64)
-      if (uploadError) console.warn('[check-in] selfie upload failed:', uploadError)
-
-      await checkIn(state.employee.id, state.site?.id ?? null, coords, workMode, path)
-      haptics.success()
-      setNotice(path ? 'Checked in.' : 'Checked in — the photo could not be saved.')
-      await load()
-    } catch (err) {
-      haptics.error()
-      setError(err instanceof Error ? err.message : 'Check-in failed.')
-    } finally {
-      setBusy(false)
-    }
+    setNotice('Checking your face…')
+    describeWith(matcherRef, base64)
   }
+
+  /**
+   * Step three: the matcher returned. Ask Postgres for the verdict, then write.
+   *
+   * The distance is decided server-side — this only reads the answer. A client
+   * that skipped this step could still post a row, which is why the score it
+   * writes comes from the RPC and not from anything computed here.
+   */
+  const onDescribed = useCallback(
+    async (result: FaceResult) => {
+      const base64 = pendingShot.current
+      pendingShot.current = null
+      if (!state.employee || !user || !base64) {
+        setBusy(false)
+        return
+      }
+
+      setNotice(null)
+      try {
+        if (!result.ok) {
+          haptics.error()
+          setError(
+            result.reason === 'no-face'
+              ? 'No face detected. Move into better light and try again.'
+              : result.reason === 'many-faces'
+                ? 'More than one face in the photo. Try again alone.'
+                : `Could not read your face: ${result.message}`,
+          )
+          return
+        }
+
+        const verdict = await verifyFace(result.descriptor)
+
+        if (!verdict.enrolled) {
+          haptics.error()
+          setError('Your face is not enrolled yet. Enrol once on the web portal first.')
+          return
+        }
+        if (!verdict.matched) {
+          haptics.error()
+          setError('Your face did not match the enrolled template. Face the camera in good light and retry.')
+          return
+        }
+
+        const coords = await readLocation()
+        const { path, error: uploadError } = await uploadSelfie(user.id, base64)
+        if (uploadError) console.warn('[check-in] selfie upload failed:', uploadError)
+
+        await checkIn(
+          state.employee.id,
+          state.site?.id ?? null,
+          coords,
+          workMode,
+          path,
+          verdict.distance,
+        )
+        haptics.success()
+        setNotice('Checked in — face verified.')
+        await load()
+      } catch (err) {
+        haptics.error()
+        setError(err instanceof Error ? err.message : 'Check-in failed.')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [state.employee, state.site, user, workMode, load],
+  )
 
   async function onRequestRecheckin() {
     if (!state.today) return
@@ -505,10 +563,18 @@ export default function HomeRoute() {
       </ScrollView>
       <TabBar />
 
+      {/* Offscreen. Runs the same face-api build the web uses, so the
+          descriptors are comparable to the enrolled templates. */}
+      <FaceMatcher
+        ref={matcherRef}
+        modelsOrigin={process.env.EXPO_PUBLIC_SITE_URL ?? 'https://geo-att.vercel.app'}
+        onResult={onDescribed}
+      />
+
       <FaceCapture
         visible={cameraOpen}
         onCancel={() => setCameraOpen(false)}
-        onCaptured={({ base64 }) => void completeCheckIn(base64)}
+        onCaptured={({ base64 }) => onCaptured(base64)}
       />
     </Screen>
   )
