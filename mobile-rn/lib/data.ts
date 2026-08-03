@@ -22,6 +22,8 @@ export type Employee = {
   site_id: string | null
   shift_id: string | null
   reward_points: number
+  /** One 128-float array per enrolled pose. Presence is the enrolment gate. */
+  face_descriptor: number[][] | number[] | null
 }
 
 export type Attendance = {
@@ -33,6 +35,7 @@ export type Attendance = {
   work_minutes: number
   is_late: boolean
   work_mode: string
+  recheckin_status: string
 }
 
 export type Site = {
@@ -44,12 +47,15 @@ export type Site = {
   radius_m: number
 }
 
+export type WorkMode = 'on_site' | 'remote' | 'hybrid'
+
 export type Shift = {
   id: string
   name: string
   start_time: string
   end_time: string
   grace_minutes: number
+  work_mode: WorkMode
 }
 
 /** `YYYY-MM-DD` in the device's local timezone, not UTC. */
@@ -69,7 +75,7 @@ export async function getMyEmployee(): Promise<Employee | null> {
   const { data, error } = await requireSupabase()
     .from('employees')
     .select(
-      'id, employee_id, full_name, email, designation, department, status, site_id, shift_id, reward_points',
+      'id, employee_id, full_name, email, designation, department, status, site_id, shift_id, reward_points, face_descriptor',
     )
     .maybeSingle()
 
@@ -92,7 +98,7 @@ export async function getShift(id: string | null): Promise<Shift | null> {
   if (!id) return null
   const { data, error } = await requireSupabase()
     .from('shifts')
-    .select('id, name, start_time, end_time, grace_minutes')
+    .select('id, name, start_time, end_time, grace_minutes, work_mode')
     .eq('id', id)
     .maybeSingle()
   if (error) throw error
@@ -102,7 +108,7 @@ export async function getShift(id: string | null): Promise<Shift | null> {
 export async function getToday(employeeId: string): Promise<Attendance | null> {
   const { data, error } = await requireSupabase()
     .from('attendance')
-    .select('id, date, check_in, check_out, status, work_minutes, is_late, work_mode')
+    .select('id, date, check_in, check_out, status, work_minutes, is_late, work_mode, recheckin_status')
     .eq('employee_id', employeeId)
     .eq('date', localDateKey())
     .maybeSingle()
@@ -118,7 +124,7 @@ export async function getHistory(employeeId: string, days = 35): Promise<Attenda
 
   const { data, error } = await requireSupabase()
     .from('attendance')
-    .select('id, date, check_in, check_out, status, work_minutes, is_late, work_mode')
+    .select('id, date, check_in, check_out, status, work_minutes, is_late, work_mode, recheckin_status')
     .eq('employee_id', employeeId)
     .gte('date', localDateKey(since))
     .order('date', { ascending: false })
@@ -171,6 +177,7 @@ export async function checkIn(
   siteId: string | null,
   coords: Coords | null,
   workMode: 'on_site' | 'remote' = 'on_site',
+  selfiePath: string | null = null,
 ): Promise<void> {
   const { error } = await requireSupabase()
     .from('attendance')
@@ -184,6 +191,9 @@ export async function checkIn(
         check_in_lat: coords?.latitude ?? null,
         check_in_lng: coords?.longitude ?? null,
         check_in_accuracy_m: coords?.accuracy ?? null,
+        // Object path, not a URL — see uploadSelfie. face_match_score stays
+        // null: this app captures evidence but does not compute a descriptor.
+        check_in_selfie: selfiePath,
       },
       { onConflict: 'employee_id,date' },
     )
@@ -442,4 +452,100 @@ export function timeAgo(iso: string): string {
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d ago`
   return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' })
+}
+
+// ── Work mode, enrolment and re-check-in ───────────────────────────────────
+
+/**
+ * Which work modes the employee may pick at check-in. Ported verbatim from the
+ * web's `allowedWorkModes`.
+ *
+ * Deliberately derived from the assignment rather than free choice: if HR put
+ * someone on an office site with an on-site rota, letting them self-select
+ * "work from home" would waive the geofence they were meant to be held to.
+ * Flexibility is granted by HR, not claimed by the employee.
+ *
+ * Where both are offered the design is policy-*visible* rather than
+ * policy-enforced — the choice is recorded per day on the attendance row so HR
+ * can see exactly who claimed remote and when, and picking on-site still
+ * enforces the fence in full.
+ */
+export function allowedWorkModes(site: Site | null, shift: Shift | null): ('on_site' | 'remote')[] {
+  const kind = site?.kind ?? 'office'
+  const rota = shift?.work_mode ?? 'on_site'
+  if (rota === 'remote' || kind === 'remote') return ['remote']
+  return ['on_site', 'remote']
+}
+
+/**
+ * Whether a face template exists.
+ *
+ * The web blocks check-in entirely until this is true — the template is the
+ * identity anchor for every future check-in. Older records hold a single flat
+ * descriptor rather than one array per pose, so both shapes count.
+ */
+export function isFaceEnrolled(employee: Employee | null): boolean {
+  const d = employee?.face_descriptor
+  return Array.isArray(d) && d.length > 0
+}
+
+/**
+ * Ask HR to reopen the day after checking out.
+ *
+ * Sets the request only. The approval is HR's, and the RLS policy stops an
+ * employee writing `approved` themselves — which is the point of routing it
+ * through a request rather than simply clearing check_out.
+ */
+export async function requestRecheckin(attendanceId: string, note: string): Promise<void> {
+  const { error } = await requireSupabase()
+    .from('attendance')
+    .update({
+      recheckin_status: 'requested',
+      recheckin_requested_at: new Date().toISOString(),
+      recheckin_note: note.trim() || null,
+    })
+    .eq('id', attendanceId)
+  if (error) throw error
+}
+
+// ── Check-in selfie ────────────────────────────────────────────────────────
+
+/**
+ * Upload a check-in selfie to the private `attendance-selfies` bucket.
+ *
+ * The path is `<uid>/<date>-<epoch>.jpg`. That first segment is not cosmetic:
+ * the storage policies key on it — `storage_owner_uid(name)` reads segment one
+ * and compares it to auth.uid() — so an object stored anywhere else is
+ * unreadable even by the person who uploaded it.
+ *
+ * Returns the object PATH, never a URL. The bucket is private, so any URL is a
+ * signed one that expires; persisting it against the attendance row would
+ * store a link that is dead by the time HR opens the record.
+ *
+ * Failure is returned rather than thrown. A selfie is evidence attached to a
+ * check-in, not the check-in itself — losing the upload must not lose someone's
+ * attendance for the day.
+ */
+export async function uploadSelfie(
+  userId: string,
+  base64Jpeg: string,
+): Promise<{ path: string | null; error: string | null }> {
+  try {
+    const path = `${userId}/${localDateKey()}-${Date.now()}.jpg`
+
+    // Supabase Storage wants bytes; RN has no Buffer and atob on a large image
+    // is slow, so decode straight into a typed array.
+    const binary = globalThis.atob(base64Jpeg)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+
+    const { error } = await requireSupabase()
+      .storage.from('attendance-selfies')
+      .upload(path, bytes, { contentType: 'image/jpeg', upsert: false })
+
+    if (error) return { path: null, error: error.message }
+    return { path, error: null }
+  } catch (err) {
+    return { path: null, error: err instanceof Error ? err.message : 'Upload failed.' }
+  }
 }

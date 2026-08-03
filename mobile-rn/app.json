@@ -51,7 +51,16 @@
           "locationWhenInUsePermission": "geoAtt records where you check in, so your attendance can be confirmed against your assigned work site. Location is read only at the moment you check in or out."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "//": "iOS terminates the app if it opens the camera without a usage string, exactly as with location. Microphone and media-library are explicitly disabled: check-in takes one still photo, and asking for either would be a larger permission than the feature needs and a likely store rejection.",
+          "cameraPermission": "geoAtt takes a photo when you check in, so your attendance can be verified. Photos are stored privately and are visible only to you and HR.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -262,6 +262,7 @@ export default function AttendanceSection({
                   <th>In</th>
                   <th>Out</th>
                   <th>Hours</th>
+                  <th>Re-check-in</th>
                 </tr>
               </thead>
               <tbody>
@@ -297,6 +298,31 @@ export default function AttendanceSection({
                     </td>
                     <td className="tabular-nums">{formatTime(a.check_out)}</td>
                     <td className="tabular-nums">{formatDuration(a.work_minutes)}</td>
+                    <td>
+                      {/*
+                        Surfaced in the row, not only inside the editor. A
+                        request that is only visible after opening a record is
+                        one nobody discovers — and the employee is blocked until
+                        it is answered.
+                      */}
+                      {a.recheckin_status === 'requested' ? (
+                        <span
+                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                          style={{
+                            background: 'color-mix(in srgb, var(--warning) 14%, transparent)',
+                            color: 'var(--warning)',
+                          }}
+                        >
+                          <span
+                            className="inline-block h-1.5 w-1.5 rounded-full"
+                            style={{ background: 'var(--warning)' }}
+                          />
+                          Re-check-in
+                        </span>
+                      ) : a.recheckin_status === 'approved' ? (
+                        <span className="muted text-[11px]">Approved</span>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>

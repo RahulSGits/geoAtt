@@ -131,6 +131,11 @@ export default function HrDashboardClient({
 
   const pendingLeaves = leaves.filter((l) => l.status === 'pending').length
 
+  // Re-check-in requests sit inside attendance rather than in their own table,
+  // so without a count here they are invisible until someone opens the right
+  // day. An employee waiting on one cannot work in the meantime.
+  const pendingRecheckins = attendance.filter((a) => a.recheckin_status === 'requested').length
+
   /** Portal-wide sign-in counters, summed across roles. */
   const portal = useMemo(() => {
     const sum = (key: keyof LoginStatsRow) =>
@@ -240,7 +245,7 @@ export default function HrDashboardClient({
   const nav: NavItem[] = [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
     { key: 'employees', label: 'Employees', icon: Users },
-    { key: 'attendance', label: 'Attendance', icon: CalendarRange },
+    { key: 'attendance', label: 'Attendance', icon: CalendarRange, badge: pendingRecheckins },
     { key: 'leaves', label: 'Leave requests', icon: CalendarCheck, badge: pendingLeaves },
     { key: 'announcements', label: 'Announcements', icon: Megaphone },
     { key: 'members', label: 'Members & access', icon: Shield },

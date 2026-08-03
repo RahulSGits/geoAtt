@@ -13,6 +13,7 @@ import * as Location from 'expo-location'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import FaceCapture from '../components/FaceCapture'
 import GeoAttLogo from '../components/GeoAttLogo'
 import LiveClock from '../components/LiveClock'
 import Screen from '../components/Screen'
@@ -39,6 +40,10 @@ import {
   getShift,
   getSite,
   getToday,
+  isFaceEnrolled,
+  allowedWorkModes,
+  requestRecheckin,
+  uploadSelfie,
   monthStats,
   type Attendance,
   type Coords,
@@ -71,6 +76,8 @@ export default function HomeRoute() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [workMode, setWorkMode] = useState<'on_site' | 'remote'>('on_site')
+  const [cameraOpen, setCameraOpen] = useState(false)
 
   useEffect(() => {
     if (!ready) return
@@ -133,6 +140,13 @@ export default function HomeRoute() {
     }
   }
 
+  /**
+   * Step one: check the fence, then open the camera.
+   *
+   * The geofence is evaluated *before* the camera opens. Failing afterwards
+   * would make someone pose for a photo only to be told they are in the wrong
+   * place, and would leave an unused image in the bucket.
+   */
   async function onCheckIn() {
     if (!state.employee) return
     setBusy(true)
@@ -141,9 +155,7 @@ export default function HomeRoute() {
     try {
       const coords = await readLocation()
 
-      // The fence is re-checked server-side as well. This is the friendly
-      // early failure, not the control.
-      if (enforcesGeofence(state.site)) {
+      if (workMode === 'on_site' && enforcesGeofence(state.site)) {
         if (!coords) {
           haptics.error()
           setError('Location is required to check in at this site. Enable location access.')
@@ -162,12 +174,54 @@ export default function HomeRoute() {
         }
       }
 
-      await checkIn(state.employee.id, state.site?.id ?? null, coords)
+      setCameraOpen(true)
+    } catch (err) {
+      haptics.error()
+      setError(err instanceof Error ? err.message : 'Check-in failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Step two: upload the photo, then write the row. */
+  async function completeCheckIn(base64: string) {
+    setCameraOpen(false)
+    if (!state.employee || !user) return
+    setBusy(true)
+    setError(null)
+    try {
+      const coords = await readLocation()
+
+      // A failed upload must not cost someone their attendance — the selfie is
+      // evidence attached to the check-in, not the check-in itself.
+      const { path, error: uploadError } = await uploadSelfie(user.id, base64)
+      if (uploadError) console.warn('[check-in] selfie upload failed:', uploadError)
+
+      await checkIn(state.employee.id, state.site?.id ?? null, coords, workMode, path)
       haptics.success()
-      setNotice('Checked in.')
+      setNotice(path ? 'Checked in.' : 'Checked in — the photo could not be saved.')
       await load()
     } catch (err) {
+      haptics.error()
       setError(err instanceof Error ? err.message : 'Check-in failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onRequestRecheckin() {
+    if (!state.today) return
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      await requestRecheckin(state.today.id, '')
+      haptics.success()
+      setNotice('Re-check-in requested — waiting for HR approval.')
+      await load()
+    } catch (err) {
+      haptics.error()
+      setError(err instanceof Error ? err.message : 'Could not send the request.')
     } finally {
       setBusy(false)
     }
@@ -192,6 +246,14 @@ export default function HomeRoute() {
 
   const { employee, site, shift, today, history } = state
   const stats = useMemo(() => monthStats(history), [history])
+  const modes = useMemo(() => allowedWorkModes(site, shift), [site, shift])
+  const enrolled = isFaceEnrolled(employee)
+
+  // Keep the selection inside what the assignment permits: a remote-only site
+  // must not leave 'on_site' selected from a previous render.
+  useEffect(() => {
+    if (!modes.includes(workMode)) setWorkMode(modes[0])
+  }, [modes, workMode])
   const isIn = !!today?.check_in && !today?.check_out
   const isDone = !!today?.check_in && !!today?.check_out
 
@@ -257,12 +319,28 @@ export default function HomeRoute() {
                 limitation and a silent downgrade of the control the product is
                 built on.
               */}
-              <View style={styles.banner}>
-                <Text style={styles.bannerText}>
-                  Verified by location only. Face verification is available on the web
-                  portal — HR can see which check-ins were face-verified.
-                </Text>
-              </View>
+              {/*
+                Two different warnings, and the distinction matters. Not
+                enrolled is a blocker the web enforces by refusing check-in
+                outright; enrolled-but-unverified-here is a weaker check the
+                user should know about. Showing one message for both would
+                flatten a hard stop into a caveat.
+              */}
+              {!enrolled ? (
+                <View style={styles.banner}>
+                  <Text style={styles.bannerText}>
+                    Your face is not enrolled yet. Enrol once on the web portal — it becomes
+                    the template every future check-in is matched against.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.banner}>
+                  <Text style={styles.bannerText}>
+                    Verified by location only. Face verification runs on the web portal — HR
+                    can see which check-ins were face-verified.
+                  </Text>
+                </View>
+              )}
 
               {shift && (
                 <Text style={styles.meta}>
@@ -274,10 +352,70 @@ export default function HomeRoute() {
               {error && <Text style={styles.error}>{error}</Text>}
               {notice && <Text style={styles.notice}>{notice}</Text>}
 
-              {isDone ? (
-                <View style={[styles.cta, styles.ctaDone]}>
-                  <Text style={styles.ctaDoneText}>Day complete</Text>
+              {/*
+                Work mode, offered only where the assignment permits both. The
+                web derives this the same way: a remote site or rota has no
+                on-site option to give, and picking on-site keeps the geofence
+                in full.
+              */}
+              {!isDone && !isIn && modes.length > 1 && (
+                <View style={styles.modeRow}>
+                  {modes.map((m) => {
+                    const active = workMode === m
+                    return (
+                      <Pressable
+                        key={m}
+                        onPress={() => {
+                          haptics.select()
+                          setWorkMode(m)
+                        }}
+                        style={[styles.modeChip, active && styles.modeChipActive]}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: active }}
+                      >
+                        <Text style={[styles.modeText, active && styles.modeTextActive]}>
+                          {m === 'on_site' ? 'On-site' : 'Work from home'}
+                        </Text>
+                      </Pressable>
+                    )
+                  })}
                 </View>
+              )}
+
+              {isDone ? (
+                // Checked out. The web offers a re-check-in request rather than
+                // letting the employee clear check_out — the approval is HR's,
+                // and RLS stops them writing 'approved' themselves.
+                today?.recheckin_status === 'requested' ? (
+                  <View style={[styles.cta, styles.ctaDone]}>
+                    <Text style={styles.ctaDoneText}>Re-check-in requested</Text>
+                  </View>
+                ) : today?.recheckin_status === 'approved' ? (
+                  <Pressable
+                    onPress={onCheckIn}
+                    disabled={busy}
+                    style={({ pressed }) => [styles.cta, pressed && { opacity: 0.9 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Check in again"
+                  >
+                    <Text style={styles.ctaText}>CHECK IN AGAIN</Text>
+                  </Pressable>
+                ) : (
+                  <>
+                    <View style={[styles.cta, styles.ctaDone]}>
+                      <Text style={styles.ctaDoneText}>Day complete</Text>
+                    </View>
+                    <Pressable
+                      onPress={onRequestRecheckin}
+                      disabled={busy}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Request to check in again"
+                    >
+                      <Text style={styles.link}>Need to check in again?</Text>
+                    </Pressable>
+                  </>
+                )
               ) : (
                 <Pressable
                   onPress={isIn ? onCheckOut : onCheckIn}
@@ -366,6 +504,12 @@ export default function HomeRoute() {
 
       </ScrollView>
       <TabBar />
+
+      <FaceCapture
+        visible={cameraOpen}
+        onCancel={() => setCameraOpen(false)}
+        onCaptured={({ base64 }) => void completeCheckIn(base64)}
+      />
     </Screen>
   )
 }
@@ -447,6 +591,28 @@ const makeStyles = (colors: Palette, shadow: Shadow) =>
   timeValue: { color: colors.ink, fontSize: 17, fontWeight: '700', marginTop: 3 },
 
   meta: { marginTop: 10, color: colors.inkMuted, fontSize: 12 },
+
+  modeRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  modeChip: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSunken,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    alignItems: 'center',
+  },
+  modeChipActive: { backgroundColor: colors.brandSoft, borderColor: colors.brand },
+  modeText: { color: colors.inkMuted, fontSize: 12.5, fontWeight: '600' },
+  modeTextActive: { color: colors.brand },
+
+  link: {
+    marginTop: 12,
+    textAlign: 'center',
+    color: colors.inkMuted,
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
 
   banner: {
     marginTop: 14,
