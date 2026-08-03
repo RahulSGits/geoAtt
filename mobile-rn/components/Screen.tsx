@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { StyleSheet, View, type ViewStyle } from 'react-native'
 
-import { colors } from '../lib/theme'
+import { useTheme } from '../lib/scheme'
+import { radius, type Palette } from '../lib/theme'
 
 /**
  * The page surface, and the reason the web build is usable.
@@ -27,6 +28,8 @@ type Props = {
 }
 
 export default function Screen({ children, center = false, style }: Props) {
+  const { colors, shadow } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
   return (
     <View style={styles.root}>
       <View style={[styles.column, center && styles.centered, style]}>{children}</View>
@@ -34,7 +37,10 @@ export default function Screen({ children, center = false, style }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
+type Shadow = { sm: string; md: string; lg: string }
+
+const makeStyles = (colors: Palette, shadow: Shadow) =>
+  StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   column: {
     flex: 1,

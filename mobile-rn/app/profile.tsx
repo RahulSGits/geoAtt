@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import {
   ActivityIndicator,
   Pressable,
@@ -18,12 +18,15 @@ import TabBar from '../components/TabBar'
 import { useAuth } from '../lib/auth'
 import { roleLabel, roleSatisfies } from '../lib/roles'
 import { REWARD_GOAL, getMyEmployee, getShift, getSite, type Employee, type Shift, type Site } from '../lib/data'
-import { colors, radius, shadow } from '../lib/theme'
+import { useTheme, type SchemePreference } from '../lib/scheme'
+import { radius, type Palette } from '../lib/theme'
 
 export default function ProfileRoute() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { user, role, ready, logOut } = useAuth()
+  const { colors, shadow, preference, setPreference } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
 
   const [employee, setEmployee] = useState<Employee | null>(null)
   const [site, setSite] = useState<Site | null>(null)
@@ -128,6 +131,33 @@ export default function ProfileRoute() {
           </View>
         )}
 
+        <Animated.View entering={FadeInUp.duration(420).delay(240)} style={styles.card}>
+          <Text style={styles.cardTitle}>Appearance</Text>
+          <Text style={styles.cardBody}>
+            System follows your phone&apos;s setting, the way the web console follows your
+            browser.
+          </Text>
+          <View style={styles.schemeRow}>
+            {(['light', 'dark', 'system'] as SchemePreference[]).map((opt) => {
+              const active = preference === opt
+              return (
+                <Pressable
+                  key={opt}
+                  onPress={() => setPreference(opt)}
+                  style={[styles.schemeChip, active && styles.schemeChipActive]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`${opt} theme`}
+                >
+                  <Text style={[styles.schemeText, active && styles.schemeTextActive]}>
+                    {opt[0].toUpperCase() + opt.slice(1)}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+        </Animated.View>
+
         <Pressable
           onPress={async () => {
             await logOut()
@@ -145,6 +175,8 @@ export default function ProfileRoute() {
 }
 
 function Row({ label, value }: { label: string; value: string }) {
+  const { colors, shadow, preference, setPreference } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -153,7 +185,10 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
-const styles = StyleSheet.create({
+type Shadow = { sm: string; md: string; lg: string }
+
+const makeStyles = (colors: Palette, shadow: Shadow) =>
+  StyleSheet.create({
   scroll: { paddingHorizontal: 20 },
   pageTitle: {
     color: colors.ink,
@@ -201,6 +236,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.brand },
+
+  schemeRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  schemeChip: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSunken,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    alignItems: 'center',
+  },
+  schemeChipActive: { backgroundColor: colors.brandSoft, borderColor: colors.brand },
+  schemeText: { color: colors.inkMuted, fontSize: 13, fontWeight: '600' },
+  schemeTextActive: { color: colors.brand },
 
   signOut: {
     marginTop: 6,

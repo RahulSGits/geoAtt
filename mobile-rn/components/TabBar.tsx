@@ -1,9 +1,11 @@
+import { useMemo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { usePathname, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
-import { colors } from '../lib/theme'
+import { useTheme } from '../lib/scheme'
+import { radius, type Palette } from '../lib/theme'
 
 /**
  * Bottom navigation for the employee surface.
@@ -27,6 +29,8 @@ const TABS: Tab[] = [
 ]
 
 export default function TabBar() {
+  const { colors, shadow } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
   const router = useRouter()
   const pathname = usePathname()
   const insets = useSafeAreaInsets()
@@ -89,7 +93,10 @@ function TabIcon({ name, color }: { name: IconName; color: string }) {
   )
 }
 
-const styles = StyleSheet.create({
+type Shadow = { sm: string; md: string; lg: string }
+
+const makeStyles = (colors: Palette, shadow: Shadow) =>
+  StyleSheet.create({
   bar: {
     flexDirection: 'row',
     borderTopWidth: 1,

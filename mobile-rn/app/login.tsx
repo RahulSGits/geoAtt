@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -20,7 +20,8 @@ import Screen from '../components/Screen'
 import { authErrorMessage, useAuth } from '../lib/auth'
 import { homeFor } from '../lib/roles'
 import { isSupabaseConfigured } from '../lib/supabase'
-import { colors, radius, shadow } from '../lib/theme'
+import { useTheme } from '../lib/scheme'
+import { radius, type Palette } from '../lib/theme'
 
 /**
  * Sign-in only, by design. geoAtt has no public registration on any platform:
@@ -33,6 +34,8 @@ export default function LoginRoute() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { user, role, ready, signIn, resetPassword } = useAuth()
+  const { colors, shadow } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
 
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -211,6 +214,8 @@ function Field({
   icon: React.ReactNode
   trailing?: React.ReactNode
 }) {
+  const { colors, shadow } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
   return (
     <View style={styles.field}>
       <View style={styles.fieldIcon}>{icon}</View>
@@ -225,7 +230,10 @@ function Field({
   )
 }
 
-const styles = StyleSheet.create({
+type Shadow = { sm: string; md: string; lg: string }
+
+const makeStyles = (colors: Palette, shadow: Shadow) =>
+  StyleSheet.create({
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 22 },
 
   header: { alignItems: 'center', marginBottom: 26 },

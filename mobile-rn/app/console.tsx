@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInUp } from 'react-native-reanimated'
@@ -8,7 +8,8 @@ import GeoAttLogo from '../components/GeoAttLogo'
 import Screen from '../components/Screen'
 import { useAuth } from '../lib/auth'
 import { roleLabel, roleSatisfies } from '../lib/roles'
-import { colors, radius, shadow } from '../lib/theme'
+import { useTheme } from '../lib/scheme'
+import { radius, type Palette } from '../lib/theme'
 
 /** Where the web console lives. Overridable per build. */
 const CONSOLE_URL = process.env.EXPO_PUBLIC_SITE_URL ?? 'https://geo-att.vercel.app'
@@ -34,6 +35,8 @@ export default function ConsoleRoute() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { user, role, fullName, ready, logOut } = useAuth()
+  const { colors, shadow } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
 
   useEffect(() => {
     if (!ready) return
@@ -103,7 +106,10 @@ export default function ConsoleRoute() {
   )
 }
 
-const styles = StyleSheet.create({
+type Shadow = { sm: string; md: string; lg: string }
+
+const makeStyles = (colors: Palette, shadow: Shadow) =>
+  StyleSheet.create({
   scroll: { paddingHorizontal: 20 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
   hello: { color: colors.ink, fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },

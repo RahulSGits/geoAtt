@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -30,7 +30,8 @@ import {
   type Leave,
   type LeaveType,
 } from '../lib/data'
-import { colors, radius, shadow } from '../lib/theme'
+import { useTheme } from '../lib/scheme'
+import { radius, type Palette } from '../lib/theme'
 
 /** `YYYY-MM-DD`, the format both the input and the date column use. */
 const DATE_HINT = 'YYYY-MM-DD'
@@ -40,6 +41,8 @@ export default function LeaveRoute() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { user, role, ready } = useAuth()
+  const { colors, shadow } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
 
   const [employeeId, setEmployeeId] = useState<string | null>(null)
   const [types, setTypes] = useState<LeaveType[]>([])
@@ -292,6 +295,8 @@ export default function LeaveRoute() {
 }
 
 function LeaveBadge({ status }: { status: Leave['status'] }) {
+  const { colors, shadow } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
   const tone =
     status === 'approved'
       ? colors.success
@@ -305,7 +310,10 @@ function LeaveBadge({ status }: { status: Leave['status'] }) {
   )
 }
 
-const styles = StyleSheet.create({
+type Shadow = { sm: string; md: string; lg: string }
+
+const makeStyles = (colors: Palette, shadow: Shadow) =>
+  StyleSheet.create({
   scroll: { paddingHorizontal: 20 },
   pageTitle: {
     color: colors.ink,

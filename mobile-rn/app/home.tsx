@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import {
   ActivityIndicator,
   Pressable,
@@ -36,7 +36,8 @@ import {
   type Shift,
   type Site,
 } from '../lib/data'
-import { colors, radius, shadow } from '../lib/theme'
+import { useTheme } from '../lib/scheme'
+import { radius, type Palette } from '../lib/theme'
 
 type State = {
   employee: Employee | null
@@ -52,6 +53,8 @@ export default function HomeRoute() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { user, role, ready, logOut } = useAuth()
+  const { colors, shadow } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
 
   const [state, setState] = useState<State>(EMPTY)
   const [loading, setLoading] = useState(true)
@@ -310,6 +313,8 @@ export default function HomeRoute() {
 }
 
 function Time({ label, value }: { label: string; value: string }) {
+  const { colors, shadow } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
   return (
     <View style={{ flex: 1 }}>
       <Text style={styles.timeLabel}>{label}</Text>
@@ -328,6 +333,8 @@ function StatusPill({
   late?: boolean
   compact?: boolean
 }) {
+  const { colors, shadow } = useTheme()
+  const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
   const label = late && status === 'present' ? 'late' : status
   const tone =
     label === 'present'
@@ -349,7 +356,10 @@ function StatusPill({
   )
 }
 
-const styles = StyleSheet.create({
+type Shadow = { sm: string; md: string; lg: string }
+
+const makeStyles = (colors: Palette, shadow: Shadow) =>
+  StyleSheet.create({
   scroll: { paddingHorizontal: 20 },
 
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
