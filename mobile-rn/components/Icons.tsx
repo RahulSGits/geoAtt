@@ -1,4 +1,4 @@
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 /**
  * The four glyphs the auth screens need, drawn inline.
@@ -79,6 +79,55 @@ export function EyeOffIcon({ size = 20, color = '#94A3B8' }: IconProps) {
         strokeLinecap="round"
       />
       <Path d="m4 4 16 16" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+/** Stat-tile glyphs, mirroring the lucide icons the web's StatCards use. */
+export function BadgeCheckIcon({ size = 15, color = '#047857' }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path
+        d="M12 2.8 14 4.6l2.7-.2.6 2.6 2.3 1.4-1.2 2.4 1.2 2.4-2.3 1.4-.6 2.6-2.7-.2-2 1.8-2-1.8-2.7.2-.6-2.6L2.4 13l1.2-2.4L2.4 8.2l2.3-1.4.6-2.6 2.7.2Z"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinejoin="round"
+      />
+      <Path d="m9 12 2 2 4-4" stroke={color} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
+export function TimerIcon({ size = 15, color = '#1E40AF' }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Circle cx={12} cy={13} r={8} stroke={color} strokeWidth={1.7} />
+      <Path d="M12 9v4l2.5 1.5M9 2h6" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+export function TrendIcon({ size = 15, color = '#B45309' }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path
+        d="M3 16.5 9 10l4 4 7.5-7.5"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path d="M15 6h6v6" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
+export function CalendarCheckIcon({ size = 15, color = '#1D4ED8' }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Rect x={3.5} y={5} width={17} height={15} rx={2.5} stroke={color} strokeWidth={1.7} />
+      <Path d="M3.5 9.5h17M8 3.5V6M16 3.5V6" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+      <Path d="m9 14 2 2 4-4" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   )
 }

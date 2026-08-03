@@ -14,7 +14,15 @@ import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import GeoAttLogo from '../components/GeoAttLogo'
+import LiveClock from '../components/LiveClock'
 import Screen from '../components/Screen'
+import StatCard from '../components/StatCard'
+import {
+  BadgeCheckIcon,
+  CalendarCheckIcon,
+  TimerIcon,
+  TrendIcon,
+} from '../components/Icons'
 import TabBar from '../components/TabBar'
 import { useAuth } from '../lib/auth'
 import { roleSatisfies } from '../lib/roles'
@@ -30,6 +38,7 @@ import {
   getShift,
   getSite,
   getToday,
+  monthStats,
   type Attendance,
   type Coords,
   type Employee,
@@ -177,6 +186,7 @@ export default function HomeRoute() {
   }
 
   const { employee, site, shift, today, history } = state
+  const stats = useMemo(() => monthStats(history), [history])
   const isIn = !!today?.check_in && !today?.check_out
   const isDone = !!today?.check_in && !!today?.check_out
 
@@ -202,6 +212,7 @@ export default function HomeRoute() {
               {employee?.employee_id ? `${employee.employee_id} · ` : ''}
               {employee?.designation ?? user?.email ?? ''}
             </Text>
+            <LiveClock style={styles.clock} />
           </View>
         </Animated.View>
 
@@ -270,8 +281,45 @@ export default function HomeRoute() {
               )}
             </Animated.View>
 
-            <Animated.View entering={FadeInUp.duration(420).delay(160)} style={styles.card}>
-              <Text style={styles.cardTitle}>Last 14 days</Text>
+            <Animated.View
+              entering={FadeInUp.duration(420).delay(140)}
+              style={styles.statRow}
+            >
+              <StatCard
+                label="Present"
+                value={stats.present}
+                sub="this month"
+                tone={colors.success}
+                icon={<BadgeCheckIcon color={colors.success} />}
+              />
+              <StatCard
+                label="Hours logged"
+                value={stats.hours}
+                decimals={1}
+                suffix="h"
+                sub="this month"
+                tone={colors.brand}
+                icon={<TimerIcon color={colors.brand} />}
+              />
+              <StatCard
+                label="Attendance"
+                value={stats.rate}
+                suffix="%"
+                sub="this month"
+                tone={colors.warning}
+                icon={<TrendIcon color={colors.warning} />}
+              />
+              <StatCard
+                label="Leaves taken"
+                value={stats.onLeave}
+                sub="this month"
+                tone={colors.info}
+                icon={<CalendarCheckIcon color={colors.info} />}
+              />
+            </Animated.View>
+
+            <Animated.View entering={FadeInUp.duration(420).delay(200)} style={styles.card}>
+              <Text style={styles.cardTitle}>Recent</Text>
               {history.length === 0 ? (
                 <Text style={styles.cardBody}>No attendance recorded yet.</Text>
               ) : (
@@ -365,6 +413,10 @@ const makeStyles = (colors: Palette, shadow: Shadow) =>
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
   hello: { color: colors.ink, fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
   sub: { color: colors.inkMuted, fontSize: 12.5, marginTop: 2 },
+  clock: { color: colors.inkFaint, fontSize: 11.5, marginTop: 3 },
+
+  // `gap` rather than margins so the two-per-row wrap has no trailing gutter.
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
 
   card: {
     backgroundColor: colors.surface,

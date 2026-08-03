@@ -110,7 +110,9 @@ export async function getToday(employeeId: string): Promise<Attendance | null> {
   return (data as Attendance) ?? null
 }
 
-export async function getHistory(employeeId: string, days = 14): Promise<Attendance[]> {
+export async function getHistory(employeeId: string, days = 35): Promise<Attendance[]> {
+  // 35 days by default, not 14: monthStats needs the whole calendar month, and
+  // on the 31st a 14-day window would silently omit half of it.
   const since = new Date()
   since.setDate(since.getDate() - days)
 
@@ -322,4 +324,44 @@ export async function withdrawLeave(id: string): Promise<void> {
 export function leaveDays(start: string, end: string): number {
   const ms = new Date(end).getTime() - new Date(start).getTime()
   return Math.max(1, Math.round(ms / 86_400_000) + 1)
+}
+
+/**
+ * This month's figures, computed exactly as the web's `monthStats` does.
+ *
+ * The rate counts a half day as half a day present, over days that were
+ * actually counted — present + half + absent. Leave and rest days are excluded
+ * from the denominator rather than scored as absences, which is why someone on
+ * approved leave does not watch their attendance percentage fall.
+ *
+ * Kept identical to the web deliberately: two different numbers for "your
+ * attendance this month" on two screens of the same product is worse than
+ * either number alone.
+ */
+export function monthStats(rows: Attendance[]): {
+  present: number
+  half: number
+  absent: number
+  onLeave: number
+  hours: number
+  rate: number
+} {
+  const prefix = localDateKey().slice(0, 7)
+  const inMonth = rows.filter((a) => a.date.startsWith(prefix))
+
+  const present = inMonth.filter((a) => a.status === 'present').length
+  const half = inMonth.filter((a) => a.status === 'half').length
+  const absent = inMonth.filter((a) => a.status === 'absent').length
+  const onLeave = inMonth.filter((a) => a.status === 'leave').length
+  const minutes = inMonth.reduce((sum, a) => sum + (a.work_minutes || 0), 0)
+  const counted = present + half + absent
+
+  return {
+    present,
+    half,
+    absent,
+    onLeave,
+    hours: minutes / 60,
+    rate: counted === 0 ? 0 : ((present + half * 0.5) / counted) * 100,
+  }
 }
