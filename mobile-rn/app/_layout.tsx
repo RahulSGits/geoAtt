@@ -37,6 +37,8 @@ export default function RootLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="login" />
             <Stack.Screen name="home" />
+            <Stack.Screen name="leave" />
+            <Stack.Screen name="profile" />
             {/* HR and admin land here — see lib/roles.ts homeFor(). */}
             <Stack.Screen name="console" />
           </Stack>

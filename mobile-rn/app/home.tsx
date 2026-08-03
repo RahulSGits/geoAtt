@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import GeoAttLogo from '../components/GeoAttLogo'
 import Screen from '../components/Screen'
+import TabBar from '../components/TabBar'
 import { useAuth } from '../lib/auth'
 import { roleSatisfies } from '../lib/roles'
 import {
@@ -303,6 +304,7 @@ export default function HomeRoute() {
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
       </ScrollView>
+      <TabBar />
     </Screen>
   )
 }

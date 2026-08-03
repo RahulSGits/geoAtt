@@ -213,3 +213,113 @@ export function formatTime(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
+
+/** Balance at which a reward can be claimed. Mirrors the web's types.ts. */
+export const REWARD_GOAL = 1000
+
+// ── Leave ──────────────────────────────────────────────────────────────────
+
+export type LeaveStatus = 'pending' | 'approved' | 'rejected'
+
+export type Leave = {
+  id: string
+  leave_type: string
+  start_date: string
+  end_date: string
+  reason: string | null
+  status: LeaveStatus
+  decision_note: string | null
+  created_at: string
+}
+
+export type LeaveType = { id: string; name: string; is_wfh: boolean }
+
+export async function getLeaveTypes(): Promise<LeaveType[]> {
+  const { data, error } = await requireSupabase()
+    .from('leave_types')
+    .select('id, name, is_wfh')
+    .eq('is_active', true)
+    .order('name')
+  if (error) throw error
+  return (data as LeaveType[]) ?? []
+}
+
+export async function getLeaves(employeeId: string): Promise<Leave[]> {
+  const { data, error } = await requireSupabase()
+    .from('leaves')
+    .select('id, leave_type, start_date, end_date, reason, status, decision_note, created_at')
+    .eq('employee_id', employeeId)
+    .order('start_date', { ascending: false })
+  if (error) throw error
+  return (data as Leave[]) ?? []
+}
+
+/**
+ * File a leave request.
+ *
+ * The overlap check mirrors the web's applyLeave: a request that covers a day
+ * already claimed by a pending or approved one is refused, so HR never has to
+ * reconcile two competing rows for the same date. Rejected requests are
+ * excluded — those days are free again.
+ *
+ * The database enforces the same rule with an exclusion constraint, so a race
+ * between two devices still cannot land both. This check exists to turn that
+ * constraint violation into a sentence a person can act on.
+ *
+ * `leave_type` is written as text. A trigger resolves it to leave_types and
+ * fills leave_type_id, which is what carries the WFH flag through to HR's
+ * approval rule.
+ */
+export async function applyLeave(input: {
+  employeeId: string
+  leaveType: string
+  startDate: string
+  endDate: string
+  reason: string
+}): Promise<void> {
+  const supabase = requireSupabase()
+
+  const { data: clash } = await supabase
+    .from('leaves')
+    .select('id')
+    .eq('employee_id', input.employeeId)
+    .neq('status', 'rejected')
+    .lte('start_date', input.endDate)
+    .gte('end_date', input.startDate)
+    .limit(1)
+
+  if (clash && clash.length > 0) {
+    throw new Error('You already have a leave request covering some of those dates.')
+  }
+
+  const { error } = await supabase.from('leaves').insert({
+    employee_id: input.employeeId,
+    leave_type: input.leaveType,
+    start_date: input.startDate,
+    end_date: input.endDate,
+    reason: input.reason.trim() || null,
+    status: 'pending',
+  })
+  if (error) throw error
+}
+
+/**
+ * Withdraw a request.
+ *
+ * Only a pending one, matching the web and the RLS policy: once HR has decided,
+ * the record is theirs and the employee cannot quietly remove the evidence.
+ */
+export async function withdrawLeave(id: string): Promise<void> {
+  const { error } = await requireSupabase()
+    .from('leaves')
+    .delete()
+    .eq('id', id)
+    .eq('status', 'pending')
+  if (error) throw error
+}
+
+/** Inclusive day count, the way the leave queue counts it. */
+export function leaveDays(start: string, end: string): number {
+  const ms = new Date(end).getTime() - new Date(start).getTime()
+  return Math.max(1, Math.round(ms / 86_400_000) + 1)
+}
