@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     marginTop: 10,
-    color: colors.onBrandMuted,
+    color: colors.onBackdropMuted,
     fontSize: 11,
     fontWeight: '600',
     // Wide tracking is what separates a tagline from a subtitle at this size.

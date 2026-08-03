@@ -43,7 +43,10 @@ type Props = {
 export default function GeoAttLogo({ size = 132, static: isStatic = false }: Props) {
   const plateScale = useSharedValue(isStatic ? 1 : 0.62)
   const plateOpacity = useSharedValue(isStatic ? 1 : 0)
-  const glow = useSharedValue(isStatic ? 0.5 : 0)
+  // Static renders sit on the light page surface, where the bloom reads as a
+  // blur artifact rather than a glow. Only the splash — which is not static,
+  // and paints its own dark gradient — has a backdrop dark enough for it.
+  const glow = useSharedValue(0)
 
   // One progress value per ridge so they can be staggered. A single shared
   // value drives all of them; each Ridge reads its own slice by index, which
@@ -98,11 +101,11 @@ export default function GeoAttLogo({ size = 132, static: isStatic = false }: Pro
           StyleSheet.absoluteFill,
           {
             borderRadius: size / 2,
-            backgroundColor: colors.brandLight,
+            backgroundColor: colors.plateFrom,
             // A cheap bloom. `boxShadow` rather than the shadow* props, and
             // `pointerEvents` in style rather than as a prop — both of the old
             // forms are deprecated in React Native 0.86 and warn every render.
-            boxShadow: `0px 0px ${size * 0.42}px ${colors.brandLight}`,
+            boxShadow: `0px 0px ${size * 0.42}px ${colors.plateFrom}`,
             pointerEvents: 'none',
           },
           glowStyle,
@@ -113,8 +116,8 @@ export default function GeoAttLogo({ size = 132, static: isStatic = false }: Pro
         <Svg width={size} height={size} viewBox={`0 0 ${VIEW} ${VIEW}`}>
           <Defs>
             <LinearGradient id="plate" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor={colors.brandLight} />
-              <Stop offset="1" stopColor={colors.brandDark} />
+              <Stop offset="0" stopColor={colors.plateFrom} />
+              <Stop offset="1" stopColor={colors.plateTo} />
             </LinearGradient>
           </Defs>
 

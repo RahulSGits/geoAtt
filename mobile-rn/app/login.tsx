@@ -19,7 +19,7 @@ import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from '../components/Icons'
 import Screen from '../components/Screen'
 import { authErrorMessage, useAuth } from '../lib/auth'
 import { isSupabaseConfigured } from '../lib/supabase'
-import { colors, radius } from '../lib/theme'
+import { colors, radius, shadow } from '../lib/theme'
 
 /**
  * Sign-in only, by design. geoAtt has no public registration on any platform:
@@ -227,21 +227,23 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', marginBottom: 26 },
   brand: {
     marginTop: 14,
-    color: colors.onBrand,
+    color: colors.ink,
     fontSize: 27,
     fontWeight: '700',
     letterSpacing: -0.5,
   },
-  brandTag: { marginTop: 3, color: colors.onBrandMuted, fontSize: 12.5, fontWeight: '500' },
+  brandTag: { marginTop: 3, color: colors.inkMuted, fontSize: 12.5, fontWeight: '500' },
 
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     padding: 24,
-    // Lifts the card off the gradient without a hard edge. `boxShadow` covers
-    // iOS, Android and web in one prop as of RN 0.76 — the shadow*/elevation
-    // pair it replaces is deprecated and warns on every render in 0.86.
-    boxShadow: '0px 14px 26px rgba(0,0,0,0.22)',
+    // A hairline plus a soft shadow, matching the web's .card. On a light page
+    // the border does the separating; the heavy drop shadow that worked over a
+    // gradient just looks muddy here.
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    boxShadow: shadow.md,
   },
   title: { color: colors.ink, fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
   subtitle: { marginTop: 6, marginBottom: 20, color: colors.inkMuted, fontSize: 13.5, lineHeight: 19 },
@@ -268,7 +270,7 @@ const styles = StyleSheet.create({
   error: { marginTop: 2, marginBottom: 10, color: colors.danger, fontSize: 13, lineHeight: 18 },
   notice: { marginTop: 2, marginBottom: 10, color: colors.brand, fontSize: 13, lineHeight: 18 },
   warn: {
-    backgroundColor: colors.dangerSurface,
+    backgroundColor: colors.dangerSoft,
     borderRadius: radius.field,
     padding: 12,
     marginBottom: 14,

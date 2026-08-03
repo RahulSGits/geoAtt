@@ -34,7 +34,7 @@ import {
   type Shift,
   type Site,
 } from '../lib/data'
-import { colors, radius } from '../lib/theme'
+import { colors, radius, shadow } from '../lib/theme'
 
 type State = {
   employee: Employee | null
@@ -181,7 +181,7 @@ export default function HomeRoute() {
           { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 28 },
         ]}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.onBrand} />
+          <RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.brand} />
         }
         showsVerticalScrollIndicator={false}
       >
@@ -324,11 +324,11 @@ function StatusPill({
   const label = late && status === 'present' ? 'late' : status
   const tone =
     label === 'present'
-      ? '#059669'
+      ? colors.success
       : label === 'half'
-        ? '#ea580c'
+        ? colors.warning
         : label === 'late'
-          ? '#d97706'
+          ? colors.warning
           : label === 'absent'
             ? colors.danger
             : colors.inkMuted
@@ -346,15 +346,17 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20 },
 
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
-  hello: { color: colors.onBrand, fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
-  sub: { color: colors.onBrandMuted, fontSize: 12.5, marginTop: 2 },
+  hello: { color: colors.ink, fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
+  sub: { color: colors.inkMuted, fontSize: 12.5, marginTop: 2 },
 
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     padding: 20,
     marginBottom: 14,
-    boxShadow: '0px 12px 24px rgba(0,0,0,0.18)',
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    boxShadow: shadow.md,
   },
   cardTitle: { color: colors.ink, fontSize: 17, fontWeight: '700' },
   cardBody: { marginTop: 8, color: colors.inkMuted, fontSize: 13.5, lineHeight: 20 },
@@ -368,7 +370,7 @@ const styles = StyleSheet.create({
   meta: { marginTop: 10, color: colors.inkMuted, fontSize: 12 },
 
   error: { marginTop: 12, color: colors.danger, fontSize: 13, lineHeight: 18 },
-  notice: { marginTop: 12, color: '#059669', fontSize: 13, lineHeight: 18 },
+  notice: { marginTop: 12, color: colors.success, fontSize: 13, lineHeight: 18 },
 
   cta: {
     marginTop: 16,
@@ -378,7 +380,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaOut: { backgroundColor: '#059669' },
+  ctaOut: { backgroundColor: colors.success },
   ctaDisabled: { backgroundColor: colors.inkFaint },
   ctaDone: { backgroundColor: colors.surfaceSunken },
   ctaText: { color: colors.onBrand, fontSize: 14.5, fontWeight: '700', letterSpacing: 1.1 },
@@ -405,9 +407,9 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: radius.pill,
     borderWidth: 1.5,
-    borderColor: colors.onBrandFaint,
+    borderColor: colors.hairline,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  signOutText: { color: colors.onBrand, fontSize: 14, fontWeight: '600', letterSpacing: 0.6 },
+  signOutText: { color: colors.inkMuted, fontSize: 14, fontWeight: '600', letterSpacing: 0.6 },
 })
