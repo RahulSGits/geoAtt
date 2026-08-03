@@ -61,7 +61,7 @@ const EMPTY: State = { employee: null, site: null, shift: null, today: null, his
 export default function HomeRoute() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { user, role, ready, logOut } = useAuth()
+  const { user, role, ready } = useAuth()
   const { colors, shadow } = useTheme()
   const styles = useMemo(() => makeStyles(colors, shadow), [colors, shadow])
 
@@ -344,16 +344,6 @@ export default function HomeRoute() {
           </>
         )}
 
-        <Pressable
-          onPress={async () => {
-            await logOut()
-            router.replace('/login')
-          }}
-          style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.85 }]}
-          accessibilityRole="button"
-        >
-          <Text style={styles.signOutText}>Sign out</Text>
-        </Pressable>
       </ScrollView>
       <TabBar />
     </Screen>
@@ -471,14 +461,4 @@ const makeStyles = (colors: Palette, shadow: Shadow) =>
   pillCompact: { paddingHorizontal: 7, paddingVertical: 2 },
   pillText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
 
-  signOut: {
-    marginTop: 6,
-    height: 48,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.hairline,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  signOutText: { color: colors.inkMuted, fontSize: 14, fontWeight: '600', letterSpacing: 0.6 },
 })

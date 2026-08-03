@@ -19,12 +19,17 @@ import { radius, type Palette } from '../lib/theme'
  * glyphs do not justify an icon package that has to be kept in step with the
  * Expo SDK.
  */
-type Tab = { href: '/home' | '/leave' | '/profile'; label: string; icon: IconName }
-type IconName = 'clock' | 'calendar' | 'person'
+type Tab = {
+  href: '/home' | '/leave' | '/updates' | '/profile'
+  label: string
+  icon: IconName
+}
+type IconName = 'clock' | 'calendar' | 'bell' | 'person'
 
 const TABS: Tab[] = [
   { href: '/home', label: 'Attendance', icon: 'clock' },
   { href: '/leave', label: 'Leave', icon: 'calendar' },
+  { href: '/updates', label: 'Updates', icon: 'bell' },
   { href: '/profile', label: 'Profile', icon: 'person' },
 ]
 
@@ -82,6 +87,18 @@ function TabIcon({ name, color }: { name: IconName; color: string }) {
       <Svg {...common}>
         <Rect x={3.5} y={5} width={17} height={15} rx={2.5} {...stroke} />
         <Path d="M3.5 9.5h17M8 3.5V6M16 3.5V6" {...stroke} />
+      </Svg>
+    )
+  }
+  if (name === 'bell') {
+    return (
+      <Svg {...common}>
+        <Path
+          d="M6 9a6 6 0 1 1 12 0c0 3.2.7 5 1.5 6H4.5C5.3 14 6 12.2 6 9Z"
+          {...stroke}
+          strokeLinejoin="round"
+        />
+        <Path d="M10 18.5a2 2 0 0 0 4 0" {...stroke} />
       </Svg>
     )
   }

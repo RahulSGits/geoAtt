@@ -365,3 +365,81 @@ export function monthStats(rows: Attendance[]): {
     rate: counted === 0 ? 0 : ((present + half * 0.5) / counted) * 100,
   }
 }
+
+// ── Announcements and notifications ────────────────────────────────────────
+
+export type Priority = 'low' | 'normal' | 'high'
+
+export type Announcement = {
+  id: string
+  title: string
+  description: string
+  priority: Priority
+  published_at: string
+  expires_at: string | null
+}
+
+/**
+ * Company-wide posts from HR.
+ *
+ * No date filtering here on purpose: the RLS policy already restricts SELECT to
+ * rows that are published and not expired. Repeating that as a client filter
+ * would be a second place for the rule to live, and the two would eventually
+ * disagree.
+ */
+export async function getAnnouncements(): Promise<Announcement[]> {
+  const { data, error } = await requireSupabase()
+    .from('announcements')
+    .select('id, title, description, priority, published_at, expires_at')
+    .order('published_at', { ascending: false })
+  if (error) throw error
+  return (data as Announcement[]) ?? []
+}
+
+export type Notification = {
+  id: string
+  title: string
+  body: string | null
+  kind: string
+  read_at: string | null
+  created_at: string
+}
+
+/**
+ * The caller's own notifications.
+ *
+ * `recipient_id` is filtered by RLS *and* by the web app explicitly — defence
+ * in depth, so a policy widened later cannot put the whole company's feed in
+ * one person's bell. The same reasoning applies here, but the filter would need
+ * the auth uid; RLS alone is doing it, which is the boundary that matters.
+ */
+export async function getNotifications(limit = 50): Promise<Notification[]> {
+  const { data, error } = await requireSupabase()
+    .from('notifications')
+    .select('id, title, body, kind, read_at, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data as Notification[]) ?? []
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  const { error } = await requireSupabase()
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+/** Relative time — "3h ago". Falls back to a date beyond a week. */
+export function timeAgo(iso: string): string {
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' })
+}
