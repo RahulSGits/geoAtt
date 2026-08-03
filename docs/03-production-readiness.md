@@ -124,10 +124,14 @@ Stated so nobody assumes otherwise:
   machine. Everything mobile was verified on the React Native Web target, which
   exercises the same components and data layer but not native permissions,
   Keychain storage or haptics.
-- **Face check-in end to end** — the RPC's maths is verified directly in
-  Postgres (identical vectors -> 0, a 3-4-5 triangle -> 5), but the full
-  capture -> descriptor -> verdict path needs a real camera and an HTTPS
-  deployment serving `/models`. Run it on a device before you rely on it.
+- **The camera half of face check-in.** `verify_my_face` is verified end to end
+  through a real signed-in employee session: a matching descriptor returns
+  `matched` at distance 0, small jitter still matches at 0.1, a different face
+  is refused at 2.26, the older flat-descriptor shape still compares, and an
+  employee with no template gets `enrolled: false` rather than a false refusal.
+  What has **not** run is the phone half — camera -> WebView -> descriptor —
+  which needs a real device and an HTTPS deployment serving `/models`. The
+  verdict logic is proven; the thing that feeds it is not.
 - **Email delivery** — `RESEND_API_KEY` is unset, so invites fall back to the
   shared password.
 - **Load at 600 employees.** The HR dashboard still runs `select('*')` on
