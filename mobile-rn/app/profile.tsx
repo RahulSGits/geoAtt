@@ -76,7 +76,7 @@ export default function ProfileRoute() {
 
         <Animated.View entering={FadeInUp.duration(420)} style={styles.card}>
           <View style={styles.identity}>
-            <GeoAttLogo size={52} static />
+            <GeoAttLogo size={44} static />
             <View style={{ marginLeft: 14, flex: 1 }}>
               <Text style={styles.name}>{employee?.full_name ?? user?.email ?? ''}</Text>
               <Text style={styles.email}>{employee?.email ?? user?.email ?? ''}</Text>

@@ -57,7 +57,7 @@ export default function ConsoleRoute() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeInUp.duration(420)} style={styles.header}>
-          <GeoAttLogo size={46} static />
+          <GeoAttLogo size={38} static />
           <View style={{ marginLeft: 12, flex: 1 }}>
             <Text style={styles.hello}>Hi, {name}</Text>
             <Text style={styles.sub}>{role ? roleLabel[role] : ''}</Text>

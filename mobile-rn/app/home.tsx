@@ -25,6 +25,7 @@ import {
 } from '../components/Icons'
 import TabBar from '../components/TabBar'
 import { useAuth } from '../lib/auth'
+import { haptics } from '../lib/haptics'
 import { roleSatisfies } from '../lib/roles'
 import {
   checkIn,
@@ -144,6 +145,7 @@ export default function HomeRoute() {
       // early failure, not the control.
       if (enforcesGeofence(state.site)) {
         if (!coords) {
+          haptics.error()
           setError('Location is required to check in at this site. Enable location access.')
           return
         }
@@ -152,6 +154,7 @@ export default function HomeRoute() {
           longitude: state.site!.longitude!,
         })
         if (away > state.site!.radius_m) {
+          haptics.error()
           setError(
             `You are ${Math.round(away)} m from ${state.site!.name}, outside its ${state.site!.radius_m} m zone.`,
           )
@@ -160,6 +163,7 @@ export default function HomeRoute() {
       }
 
       await checkIn(state.employee.id, state.site?.id ?? null, coords)
+      haptics.success()
       setNotice('Checked in.')
       await load()
     } catch (err) {
@@ -176,6 +180,7 @@ export default function HomeRoute() {
     setNotice(null)
     try {
       await checkOut(state.today.id, await readLocation())
+      haptics.success()
       setNotice('Checked out.')
       await load()
     } catch (err) {
@@ -205,7 +210,7 @@ export default function HomeRoute() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeInUp.duration(420)} style={styles.header}>
-          <GeoAttLogo size={46} static />
+          <GeoAttLogo size={38} static />
           <View style={{ marginLeft: 12, flex: 1 }}>
             <Text style={styles.hello}>Hi, {greeting}</Text>
             <Text style={styles.sub}>

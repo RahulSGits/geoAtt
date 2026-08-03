@@ -1,17 +1,42 @@
 {
-  "//": "The geoAtt mark: a fingerprint, as nested arcs. THIS FILE IS THE ONLY DEFINITION of the geometry. lib/logo-geometry.ts reads it to draw animated SVG; tools/generate-assets.mjs reads it to rasterise the PNGs. Those two implement different algorithms (arc paths vs signed distance fields) and always will, but the numbers must never diverge — when they did, the native splash visibly jumped as it handed over to the animated one.",
-  "//space": "Unit space: the plate is a circle of radius 0.5 centred on (0.5, 0.5). Angles are degrees in SVG convention — 0 points right, increasing clockwise, so 270 is straight up. Every ridge opens downward (roughly 180 through 360), which is what makes the stack read as a fingerprint rather than concentric circles.",
+  "//": "The geoAtt mark: a fingerprint, as nested arcs. THIS FILE IS THE ONLY DEFINITION of the geometry. lib/logo-geometry.ts reads it to draw animated SVG; tools/generate-assets.mjs reads it to rasterise the PNGs. Those two implement different algorithms (arc paths vs signed distance fields) and always will, but the numbers must never diverge \u2014 when they did, the native splash visibly jumped as it handed over to the animated one.",
+  "//space": "Unit space: the plate is a circle of radius 0.5 centred on (0.5, 0.5). Angles are degrees in SVG convention \u2014 0 points right, increasing clockwise, so 270 is straight up. Every ridge opens downward (roughly 180 through 360), which is what makes the stack read as a fingerprint rather than concentric circles.",
   "//uneven": "The spans are deliberately uneven. Equal ones read as a machine-drawn target; widening each outer ridge a little more than the last suggests a print. The last two are short fragments, one per side, because real ridges do not all survive to the edge.",
-  "//center": "Arcs are centred on (cx, cy), NOT on the plate's own centre (0.5, 0.5). The ridges only sweep the upper ~216 degrees of the circle (see //space), so a mark centred on 0.5 has its visual mass sitting well above the middle — measured, the bounding box was y 0.055..0.617, centring at 0.336, leaving the bottom third of the plate empty on the full-bleed store icon. Lowering cy to 0.664 recentres that box on 0.5. This matches how most real fingerprint icons are drawn anyway: the core sits in the lower-middle, not dead centre.",
-  "halfWidth": 0.026,
+  "//center": "Arcs are centred on (cx, cy), NOT the plate's centre (0.5, 0.5). The ridges sweep only the upper ~216 degrees, so a mark centred on 0.5 sits visually high and leaves the bottom third of a full-bleed icon empty. Lowering cy recentres the bounding box. This also matches how fingerprint icons are normally drawn: the core sits lower-middle, not dead centre.",
+  "halfWidth": 0.021,
   "cx": 0.5,
-  "cy": 0.664,
+  "cy": 0.645,
   "ridges": [
-    { "r": 0.11, "a0": 200, "a1": 340 },
-    { "r": 0.2, "a0": 183, "a1": 357 },
-    { "r": 0.29, "a0": 172, "a1": 368 },
-    { "r": 0.38, "a0": 162, "a1": 378 },
-    { "r": 0.455, "a0": 196, "a1": 258 },
-    { "r": 0.455, "a0": 282, "a1": 344 }
-  ]
+    {
+      "r": 0.1,
+      "a0": 202,
+      "a1": 338
+    },
+    {
+      "r": 0.185,
+      "a0": 186,
+      "a1": 354
+    },
+    {
+      "r": 0.27,
+      "a0": 174,
+      "a1": 366
+    },
+    {
+      "r": 0.355,
+      "a0": 164,
+      "a1": 376
+    },
+    {
+      "r": 0.425,
+      "a0": 198,
+      "a1": 256
+    },
+    {
+      "r": 0.425,
+      "a0": 284,
+      "a1": 342
+    }
+  ],
+  "//weight": "Stroke half-width. 0.021 rather than 0.026: the heavier weight was set for a 48px launcher icon, but the same geometry renders in-app at 46px where the ridges nearly touch and the mark reads as a filled disc. Thinner strokes keep the gaps legible at small sizes and look sharper at large ones \u2014 a launcher icon has more room to spare than a header."
 }

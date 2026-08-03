@@ -108,7 +108,7 @@ export default function LoginRoute() {
           showsVerticalScrollIndicator={false}
         >
           <Animated.View entering={FadeInDown.duration(520)} style={styles.header}>
-            <GeoAttLogo size={62} static />
+            <GeoAttLogo size={54} static />
             <Text style={styles.brand}>geoAtt</Text>
             <Text style={styles.brandTag}>Attendance & Workforce</Text>
           </Animated.View>

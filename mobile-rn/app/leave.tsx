@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Screen from '../components/Screen'
 import TabBar from '../components/TabBar'
 import { useAuth } from '../lib/auth'
+import { haptics } from '../lib/haptics'
 import { roleSatisfies } from '../lib/roles'
 import {
   applyLeave,
@@ -104,6 +105,7 @@ export default function LeaveRoute() {
     setBusy(true)
     try {
       await applyLeave({ employeeId, leaveType: type, startDate: start, endDate: end, reason })
+      haptics.success()
       setNotice('Request submitted. HR will review it.')
       setReason('')
       await load()
@@ -167,7 +169,10 @@ export default function LeaveRoute() {
                     return (
                       <Pressable
                         key={t.id}
-                        onPress={() => setType(t.name)}
+                        onPress={() => {
+                    haptics.select()
+                    setType(t.name)
+                  }}
                         style={[styles.chip, active && styles.chipActive]}
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
