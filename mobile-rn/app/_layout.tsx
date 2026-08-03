@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
+import OfflineBanner from '../components/OfflineBanner'
 import { AuthProvider } from '../lib/auth'
 import { ThemeProvider, useTheme } from '../lib/scheme'
 
@@ -43,6 +44,7 @@ export default function RootLayout() {
         <ThemeProvider>
           <AuthProvider>
             <Themed />
+            <OfflineBanner />
             <Stack
               screenOptions={{
                 headerShown: false,

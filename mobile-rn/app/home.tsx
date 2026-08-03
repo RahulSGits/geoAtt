@@ -249,6 +249,21 @@ export default function HomeRoute() {
                 <Time label="Worked" value={formatDuration(today?.work_minutes ?? 0)} />
               </View>
 
+              {/*
+                Standing notice, not a toast. The web refuses a check-in whose
+                face does not match the enrolled template; this app cannot make
+                that check, so every record it writes is verified by location
+                alone. Saying so on the card is the difference between a known
+                limitation and a silent downgrade of the control the product is
+                built on.
+              */}
+              <View style={styles.banner}>
+                <Text style={styles.bannerText}>
+                  Verified by location only. Face verification is available on the web
+                  portal — HR can see which check-ins were face-verified.
+                </Text>
+              </View>
+
               {shift && (
                 <Text style={styles.meta}>
                   {shift.name} · {shift.start_time.slice(0, 5)}–{shift.end_time.slice(0, 5)}
@@ -432,6 +447,15 @@ const makeStyles = (colors: Palette, shadow: Shadow) =>
   timeValue: { color: colors.ink, fontSize: 17, fontWeight: '700', marginTop: 3 },
 
   meta: { marginTop: 10, color: colors.inkMuted, fontSize: 12 },
+
+  banner: {
+    marginTop: 14,
+    backgroundColor: colors.warningSoft,
+    borderRadius: radius.field,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  bannerText: { color: colors.warning, fontSize: 12, lineHeight: 17 },
 
   error: { marginTop: 12, color: colors.danger, fontSize: 13, lineHeight: 18 },
   notice: { marginTop: 12, color: colors.success, fontSize: 13, lineHeight: 18 },
