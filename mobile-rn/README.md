@@ -16,6 +16,8 @@ the phone app. One backend, one set of accounts, every platform.
 | Runtime | Expo SDK 57 / React Native 0.86 / React 19 |
 | Routing | expo-router (file-based, typed routes) |
 | Auth + data | Supabase (`@supabase/supabase-js`), shared with the web app |
+| Session | expo-secure-store — Keychain / Keystore, chunked |
+| Location | expo-location, when-in-use only |
 | Animation | react-native-reanimated 4 (UI-thread) |
 | Vector | react-native-svg |
 | Web | React Native Web, exported static |
@@ -187,3 +189,83 @@ Native guidance.
 `app/home.tsx` is the seam where attendance features go. Not built yet:
 check-in, history, leave, notifications. Nothing here presumes how those work —
 they will read the same tables the web app already defines.
+
+
+## Roles
+
+`lib/roles.ts` ports `roleSatisfies()` from the web. The asymmetry is
+load-bearing and easy to "fix" into a bug:
+
+```
+admin ⊇ hr          an administrator may do anything HR may do
+employee is EXACT   an administrator is NOT an employee
+```
+
+That second rule is why an admin has no `employees` row, and why check-in and
+leave correctly reject them. Postgres enforces the same shape through `is_hr()`
+and `current_employee_id()`. Making `employee` inclusive so an admin could
+"test check-in" would break the geofence guarantee for the whole company.
+
+HR and admin therefore land on a **signpost**, not a console. The web HR surface
+is a roster with CSV import, an attendance grid with inline editing, a leave
+queue, a map editor and diagnostics — a phone rebuild would be strictly worse
+than the site those users already have open, and a half-console invites trust it
+cannot support.
+
+## What lives in the database, not here
+
+The app deliberately does **not** reimplement business logic:
+
+- **Attendance status, worked minutes and lateness** are set by the
+  `compute_attendance_status` trigger. `lib/data.ts` never writes them. Setting
+  them client-side is the spoofing the trigger exists to prevent, and it would
+  let the phone and the browser disagree about the same day.
+- **One row per employee per day** is a unique constraint, so check-in upserts
+  on `(employee_id, date)` — a repeated tap updates the day instead of creating
+  a second row that would double-count worked minutes.
+- **Overlapping leave** is an exclusion constraint. The client checks too, but
+  only so a race between two devices produces a sentence rather than a raw
+  constraint violation.
+- **Authorisation** is Row Level Security. The `.eq('employee_id', …)` filters
+  are for the query planner, not for safety.
+
+The geofence is checked on the client to fail early with a useful distance, and
+re-checked server-side regardless. `distanceMetres` uses the same haversine as
+the web, so a check-in is judged identically whichever client makes it.
+
+## Session storage
+
+Sessions live in the Keychain / Keystore via `lib/secure-storage.ts`, not
+AsyncStorage — a plaintext file in the app sandbox, where a refresh token is a
+live credential on a rooted or jailbroken device.
+
+The chunking there is required, not tidiness. SecureStore warns above 2048 bytes
+and can fail outright on Android, where the Keystore enforces the limit rather
+than advising it. A Supabase session exceeds it. Stored whole it works in a
+simulator and then fails on real hardware for users with longer claims.
+
+## Theming
+
+Both palettes are copied from the web's `globals.css` — `:root` and `.dark`,
+same hexes. Two things that must not be "simplified":
+
+- The brand colour **differs per scheme**. `#1E40AF` is near-black against
+  `#070912`, so dark mode uses `#818CF8` — and `onBrand` inverts with it,
+  because white on `#818CF8` fails contrast.
+- Shadows differ too. One tuned for a white page is invisible on `#070912`;
+  elevation there comes from opacity.
+
+Three settings, not two — `system` follows the OS and is the default, matching
+next-themes on the web.
+
+## Not built yet
+
+Stated plainly rather than left to be discovered:
+
+- **Face verification.** The web enrols a 128-float descriptor from
+  `@vladmandic/face-api` and re-checks it server-side. No React Native library
+  produces comparable vectors, so matching on mobile needs either that model in
+  a JS runtime or a server-side match endpoint. **Mobile check-in is GPS-only.**
+- **Push notifications.**
+- **Announcements and the notification bell.**
+- **Re-check-in requests** after checking out.
