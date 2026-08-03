@@ -16,6 +16,7 @@ import Animated, {
 
 import GeoAttLogo from '../components/GeoAttLogo'
 import { useAuth } from '../lib/auth'
+import { homeFor } from '../lib/roles'
 import { colors, splashTiming } from '../lib/theme'
 
 /**
@@ -30,7 +31,7 @@ import { colors, splashTiming } from '../lib/theme'
  */
 export default function SplashRoute() {
   const router = useRouter()
-  const { user, ready } = useAuth()
+  const { user, role, ready } = useAuth()
 
   const screenOpacity = useSharedValue(1)
   const contentShift = useSharedValue(0)

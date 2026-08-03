@@ -18,6 +18,7 @@ import GeoAttLogo from '../components/GeoAttLogo'
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from '../components/Icons'
 import Screen from '../components/Screen'
 import { authErrorMessage, useAuth } from '../lib/auth'
+import { homeFor } from '../lib/roles'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { colors, radius, shadow } from '../lib/theme'
 
@@ -31,7 +32,7 @@ import { colors, radius, shadow } from '../lib/theme'
 export default function LoginRoute() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { user, ready, signIn, resetPassword } = useAuth()
+  const { user, role, ready, signIn, resetPassword } = useAuth()
 
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -42,8 +43,8 @@ export default function LoginRoute() {
 
   // A session restored from disk lands here first; bounce straight through.
   useEffect(() => {
-    if (ready && user) router.replace('/home')
-  }, [ready, user, router])
+    if (ready && user) router.replace(homeFor(role))
+  }, [ready, user, role, router])
 
   async function submit() {
     setError(null)
@@ -57,7 +58,10 @@ export default function LoginRoute() {
     setBusy(true)
     try {
       await signIn(identifier, password)
-      router.replace('/home')
+      // Deliberately not routing here. The role arrives a moment after the
+      // session does, and the effect above sends the user to the right place
+      // once it has — routing now would send everyone to /home and bounce
+      // HR and admin straight back out.
     } catch (err) {
       setError(authErrorMessage(err))
     } finally {

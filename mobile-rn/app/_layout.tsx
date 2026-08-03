@@ -37,6 +37,8 @@ export default function RootLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="login" />
             <Stack.Screen name="home" />
+            {/* HR and admin land here — see lib/roles.ts homeFor(). */}
+            <Stack.Screen name="console" />
           </Stack>
         </AuthProvider>
       </SafeAreaProvider>

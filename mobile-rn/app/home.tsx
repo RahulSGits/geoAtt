@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import GeoAttLogo from '../components/GeoAttLogo'
 import Screen from '../components/Screen'
 import { useAuth } from '../lib/auth'
+import { roleSatisfies } from '../lib/roles'
 import {
   checkIn,
   checkOut,
@@ -49,7 +50,7 @@ const EMPTY: State = { employee: null, site: null, shift: null, today: null, his
 export default function HomeRoute() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { user, ready, logOut } = useAuth()
+  const { user, role, ready, logOut } = useAuth()
 
   const [state, setState] = useState<State>(EMPTY)
   const [loading, setLoading] = useState(true)
@@ -58,8 +59,12 @@ export default function HomeRoute() {
   const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
-    if (ready && !user) router.replace('/login')
-  }, [ready, user, router])
+    if (!ready) return
+    if (!user) router.replace('/login')
+    // HR and admin have no employees row by design, so there is nothing here
+    // for them — send them to the console signpost instead of an empty state.
+    else if (role && roleSatisfies(role, 'hr')) router.replace('/console')
+  }, [ready, user, role, router])
 
   const load = useCallback(async () => {
     setError(null)

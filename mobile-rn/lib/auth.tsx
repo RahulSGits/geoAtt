@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 
+import type { Role } from './roles'
 import { isSupabaseConfigured, requireSupabase, supabase } from './supabase'
 
 /**
@@ -15,6 +16,16 @@ import { isSupabaseConfigured, requireSupabase, supabase } from './supabase'
  */
 type AuthState = {
   user: User | null
+  /**
+   * The caller's role, from public.profiles.
+   *
+   * Read once here rather than at each call site: RLS already restricts the
+   * row to the caller, so this is one round trip that every screen would
+   * otherwise repeat. Null while loading, and for a session whose profile row
+   * has been deleted — which the proxy on web treats as signed out.
+   */
+  role: Role | null
+  fullName: string | null
   /** False until the persisted session has been replayed — gates the first route. */
   ready: boolean
   signIn: (identifier: string, password: string) => Promise<void>
@@ -47,6 +58,8 @@ async function resolveLoginEmail(identifier: string): Promise<string> {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [role, setRole] = useState<Role | null>(null)
+  const [fullName, setFullName] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -72,9 +85,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    if (!user || !supabase) {
+      setRole(null)
+      setFullName(null)
+      return
+    }
+    let cancelled = false
+    supabase
+      .from('profiles')
+      .select('role, full_name')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return
+        setRole((data?.role as Role) ?? null)
+        setFullName((data?.full_name as string) ?? null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
   const value = useMemo<AuthState>(
     () => ({
       user,
+      role,
+      fullName,
       ready,
       signIn: async (identifier, password) => {
         const email = await resolveLoginEmail(identifier)
@@ -89,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (supabase) await supabase.auth.signOut()
       },
     }),
-    [user, ready],
+    [user, role, fullName, ready],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

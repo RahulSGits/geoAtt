@@ -50,7 +50,8 @@
           "//": "iOS terminates the app outright if it asks for location without a usage string, so this is not optional. Only when-in-use is requested: attendance is recorded while the employee is looking at the screen, and asking for background location would be a far larger permission than the feature needs — and a likely App Store rejection.",
           "locationWhenInUsePermission": "geoAtt records where you check in, so your attendance can be confirmed against your assigned work site. Location is read only at the moment you check in or out."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

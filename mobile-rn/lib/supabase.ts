@@ -1,6 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { AppState, Platform } from 'react-native'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+
+import { secureStorage } from './secure-storage'
 
 /**
  * The Supabase client — the same project the web app uses, so an account
@@ -31,11 +32,16 @@ let client: SupabaseClient | null = null
 if (isSupabaseConfigured) {
   client = createClient(url!, key!, {
     auth: {
-      // On native, sessions must be persisted through AsyncStorage or the user
-      // is signed out on every cold start. On web the default localStorage
-      // layer is already correct, and detectSessionInUrl lets password-reset
-      // links complete.
-      ...(Platform.OS === 'web' ? {} : { storage: AsyncStorage }),
+      // Encrypted, chunked storage — the Keychain on iOS, the Keystore on
+      // Android. AsyncStorage, which this replaced, is a plaintext file in the
+      // app sandbox, and a readable refresh token there is a live credential.
+      // See lib/secure-storage.ts for why chunking is required rather than
+      // merely tidy.
+      //
+      // On web the adapter falls through to localStorage, which is what the
+      // browser build of Supabase uses anyway and the same trust boundary as
+      // the rest of the page.
+      storage: secureStorage,
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: Platform.OS === 'web',
