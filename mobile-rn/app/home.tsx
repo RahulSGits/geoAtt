@@ -9,13 +9,12 @@ import {
   View,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import type { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import FaceCapture from '../components/FaceCapture'
-import FaceMatcher, { describeWith, type FaceResult } from '../components/FaceMatcher'
+import { faceErrorText, useFaceMatcher } from '../lib/face-matcher'
 import GeoAttLogo from '../components/GeoAttLogo'
 import LiveClock from '../components/LiveClock'
 import Screen from '../components/Screen'
@@ -81,10 +80,7 @@ export default function HomeRoute() {
   const [notice, setNotice] = useState<string | null>(null)
   const [workMode, setWorkMode] = useState<'on_site' | 'remote'>('on_site')
   const [cameraOpen, setCameraOpen] = useState(false)
-  // The captured frame is held while the matcher works, so the write can use
-  // the same bytes the descriptor came from.
-  const pendingShot = useRef<string | null>(null)
-  const matcherRef = useRef<WebView>(null)
+  const { describe, status: matcherStatus, retry: retryMatcher } = useFaceMatcher()
 
   useEffect(() => {
     if (!ready) return
@@ -190,82 +186,68 @@ export default function HomeRoute() {
     }
   }
 
-  /** Step two: hand the frame to the matcher for a descriptor. */
-  function onCaptured(base64: string) {
-    setCameraOpen(false)
-    pendingShot.current = base64
-    setBusy(true)
-    setNotice('Checking your face…')
-    describeWith(matcherRef, base64)
-  }
-
   /**
-   * Step three: the matcher returned. Ask Postgres for the verdict, then write.
+   * Step two: descriptor, verdict, row. One straight line, because `describe`
+   * resolves rather than calling back — the previous version parked the frame
+   * in a ref and waited for a message, which meant a matcher that never
+   * answered left the button spinning forever.
    *
-   * The distance is decided server-side — this only reads the answer. A client
-   * that skipped this step could still post a row, which is why the score it
-   * writes comes from the RPC and not from anything computed here.
+   * The distance is decided server-side; this only reads the answer. A client
+   * that skipped the check could still post a row, which is why the score
+   * written comes from the RPC and not from anything computed on the phone.
    */
-  const onDescribed = useCallback(
-    async (result: FaceResult) => {
-      const base64 = pendingShot.current
-      pendingShot.current = null
-      if (!state.employee || !user || !base64) {
-        setBusy(false)
+  async function completeCheckIn(base64: string) {
+    setCameraOpen(false)
+    if (!state.employee || !user) return
+
+    setBusy(true)
+    setError(null)
+    setNotice('Checking your face…')
+    try {
+      const result = await describe(base64)
+      if (!result.ok) {
+        haptics.error()
+        setNotice(null)
+        setError(faceErrorText(result))
         return
       }
 
-      setNotice(null)
-      try {
-        if (!result.ok) {
-          haptics.error()
-          setError(
-            result.reason === 'no-face'
-              ? 'No face detected. Move into better light and try again.'
-              : result.reason === 'many-faces'
-                ? 'More than one face in the photo. Try again alone.'
-                : `Could not read your face: ${result.message}`,
-          )
-          return
-        }
-
-        const verdict = await verifyFace(result.descriptor)
-
-        if (!verdict.enrolled) {
-          haptics.error()
-          setError('Your face is not enrolled yet. Enrol once on the web portal first.')
-          return
-        }
-        if (!verdict.matched) {
-          haptics.error()
-          setError('Your face did not match the enrolled template. Face the camera in good light and retry.')
-          return
-        }
-
-        const coords = await readLocation()
-        const { path, error: uploadError } = await uploadSelfie(user.id, base64)
-        if (uploadError) console.warn('[check-in] selfie upload failed:', uploadError)
-
-        await checkIn(
-          state.employee.id,
-          state.site?.id ?? null,
-          coords,
-          workMode,
-          path,
-          verdict.distance,
-        )
-        haptics.success()
-        setNotice('Checked in — face verified.')
-        await load()
-      } catch (err) {
+      const verdict = await verifyFace(result.descriptor)
+      if (!verdict.enrolled) {
         haptics.error()
-        setError(err instanceof Error ? err.message : 'Check-in failed.')
-      } finally {
-        setBusy(false)
+        setNotice(null)
+        setError('Your face is not enrolled yet. Enrol once on the web portal first.')
+        return
       }
-    },
-    [state.employee, state.site, user, workMode, load],
-  )
+      if (!verdict.matched) {
+        haptics.error()
+        setNotice(null)
+        setError(
+          'That does not match your enrolled face. Face the camera straight on, in good light, and try again.',
+        )
+        return
+      }
+
+      setNotice('Face verified — checking you in…')
+      const coords = await readLocation()
+
+      // A failed upload must not cost someone their attendance — the selfie is
+      // evidence attached to the check-in, not the check-in itself.
+      const { path, error: uploadError } = await uploadSelfie(user.id, base64)
+      if (uploadError) console.warn('[check-in] selfie upload failed:', uploadError)
+
+      await checkIn(state.employee.id, state.site?.id ?? null, coords, workMode, path, verdict.distance)
+      haptics.success()
+      setNotice('Checked in — face verified.')
+      await load()
+    } catch (err) {
+      haptics.error()
+      setNotice(null)
+      setError(err instanceof Error ? err.message : 'Check-in failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function onRequestRecheckin() {
     if (!state.today) return
@@ -313,6 +295,11 @@ export default function HomeRoute() {
     if (!modes.includes(workMode)) setWorkMode(modes[0])
   }, [modes, workMode])
   const isIn = !!today?.check_in && !today?.check_out
+
+  // Only check-IN needs the face models. Check-out has no face step, so it must
+  // never be held up by a download the user does not need.
+  const faceWarming = !isIn && matcherStatus === 'loading'
+  const faceFailed = !isIn && matcherStatus === 'failed'
   const isDone = !!today?.check_in && !!today?.check_out
 
   const greeting = employee?.full_name?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'there'
@@ -476,22 +463,34 @@ export default function HomeRoute() {
                 )
               ) : (
                 <Pressable
-                  onPress={isIn ? onCheckOut : onCheckIn}
-                  disabled={busy}
+                  onPress={
+                    isIn ? onCheckOut : faceFailed ? retryMatcher : onCheckIn
+                  }
+                  disabled={busy || faceWarming}
                   style={({ pressed }) => [
                     styles.cta,
                     isIn && styles.ctaOut,
-                    busy && styles.ctaDisabled,
+                    (busy || faceWarming) && styles.ctaDisabled,
                     pressed && { opacity: 0.9 },
                   ]}
                   accessibilityRole="button"
-                  accessibilityLabel={isIn ? 'Check out' : 'Check in'}
-                  accessibilityState={{ disabled: busy, busy }}
+                  accessibilityLabel={
+                    isIn ? 'Check out' : faceFailed ? 'Retry loading face check' : 'Check in'
+                  }
+                  accessibilityState={{ disabled: busy || faceWarming, busy: busy || faceWarming }}
                 >
                   {busy ? (
                     <ActivityIndicator color={colors.onBrand} />
                   ) : (
-                    <Text style={styles.ctaText}>{isIn ? 'CHECK OUT' : 'CHECK IN'}</Text>
+                    <Text style={styles.ctaText}>
+                      {isIn
+                        ? 'CHECK OUT'
+                        : faceWarming
+                          ? 'PREPARING FACE CHECK…'
+                          : faceFailed
+                            ? 'RETRY FACE CHECK'
+                            : 'CHECK IN'}
+                    </Text>
                   )}
                 </Pressable>
               )}
@@ -563,18 +562,11 @@ export default function HomeRoute() {
       </ScrollView>
       <TabBar />
 
-      {/* Offscreen. Runs the same face-api build the web uses, so the
-          descriptors are comparable to the enrolled templates. */}
-      <FaceMatcher
-        ref={matcherRef}
-        modelsOrigin={process.env.EXPO_PUBLIC_SITE_URL ?? 'https://geo-att.vercel.app'}
-        onResult={onDescribed}
-      />
 
       <FaceCapture
         visible={cameraOpen}
         onCancel={() => setCameraOpen(false)}
-        onCaptured={({ base64 }) => onCaptured(base64)}
+        onCaptured={({ base64 }) => void completeCheckIn(base64)}
       />
     </Screen>
   )

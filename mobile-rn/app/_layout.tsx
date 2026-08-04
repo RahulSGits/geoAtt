@@ -6,7 +6,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import OfflineBanner from '../components/OfflineBanner'
 import { AuthProvider } from '../lib/auth'
+import { FaceMatcherProvider } from '../lib/face-matcher'
 import { ThemeProvider, useTheme } from '../lib/scheme'
+
+/**
+ * Origin serving /models. Face verification loads the same face-api build and
+ * weights the website uses, so descriptors computed here are comparable to the
+ * templates employees enrolled on the web.
+ */
+const MODELS_ORIGIN = process.env.EXPO_PUBLIC_SITE_URL ?? 'https://geo-att.vercel.app'
 
 
 /**
@@ -43,6 +51,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
           <AuthProvider>
+            {/* Mounted once for the whole session, so the face models are warm
+                long before anyone reaches the check-in camera. */}
+            <FaceMatcherProvider modelsOrigin={MODELS_ORIGIN}>
             <Themed />
             <OfflineBanner />
             <Stack
@@ -61,6 +72,7 @@ export default function RootLayout() {
               {/* HR and admin land here — see lib/roles.ts homeFor(). */}
               <Stack.Screen name="console" />
             </Stack>
+            </FaceMatcherProvider>
           </AuthProvider>
         </ThemeProvider>
       </SafeAreaProvider>
